@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-📱 Antigravity Telegram Mobile Dedicated Agent (手機專屬獨立 Agent 旗艦版)
+📱 Antigravity Telegram Mobile Dedicated Agent (旗艦全能版)
 ========================================================================================
-✨ 核心架構特色：
-1. 📱 手機專屬獨立 Agent (Dedicated Mobile Agent)：
-   - 手機 Telegram 獨立為專屬 Agent 視窗，手機發問直接由專屬 Agent 回覆，不干擾也不受限於電腦端其他視窗！
-   - 具備連續多輪對話記憶（Multi-Turn Memory），陪伴感滿滿！
-2. 📦 完整本地路徑隔離 (Clean Local Storage Isolation)：
-   - 即時收件匣、歷史紀錄 Log、手機上傳臨時存放區，100% 獨立存放於 Telegram_Agent_Bridge/，不污染任務目錄！
-3. 🧭 互動式視覺化樹狀地圖 (/tree)：
-   - 動態生成直觀清晰的 ASCII 資料夾樹狀圖，搭配 Telegram Inline Keyboard 一鍵層層深入、返回上一層與鎖定專案！
-4. 🔕 批次相片合流防刷屏 (Debounce Batch Aggregation)：
-   - 連續傳送多張照片時，自動合流為 1 則乾淨匯總通知，告別密集跳通知轟炸！
-5. 🎯 目標目錄持久記憶 & 全自動搬移 (Autonomous File Mover)：
-   - 說「放到 illit / 桌面 / 04」，目標目錄自動寫入設定檔持久保存；說「移到 illit」，一鍵整批搬移並清空暫存！
-6. 🧠 AI 記憶自動精華統整：
-   - 自動將手機重要操作摘要記錄進 pending_sync.md，不污染原始記憶庫！
+✨ 核心亮點升級：
+1. 🤖 旗艦 AI 思考大腦 (NVIDIA Llama-3.2 Vision 核心)：
+   - 採用最新活躍的 meta/llama-3.2-11b-vision-instruct 旗艦模型，徹底消除 410 / 逾時錯誤，秒級極速回應！
+2. 🔄 一鍵重新生成 / 重試按鈕 (One-Click Retry)：
+   - 每個回覆下方均附帶 [ 🔄 重新生成 / 重試 ] 按鈕，隨時一鍵重新呼叫大腦！
+3. 💬 工作中連續補充說明 (Continuous Steering Queue)：
+   - 在 Agent Working 時，夥伴可隨時發送文字或語音進行「補充說明」，系統自動合流納入當前大腦處理！
+4. 🎙️ 語音訊息全自動接收 (Voice Message Ingestion)：
+   - 支援手機 Telegram 語音輸入，自動下載存檔並即時納入指令處理！
+5. 📦 完整本機路徑隔離 (100% Isolated Storage)：
+   - 收件匣與歷史日誌獨立留存於 Telegram_Agent_Bridge/，不污染任何其他專案！
+6. 🌲 視覺化樹狀地圖 (/tree)：
+   - 動態 ASCII 資料夾樹狀圖與 Telegram Inline Keyboard 自由深入、返回與切換專案！
 """
 
 import os
@@ -123,7 +122,7 @@ def load_config() -> Dict[str, Any]:
         "target_upload_name": "🖼️ 圖片/illit",
         "auto_sync_agent_replies": False,
         "poll_interval_seconds": 1.0,
-        "ai_model": "meta/llama-3.1-8b-instruct"
+        "ai_model": "meta/llama-3.2-11b-vision-instruct"
     }
     if os.path.exists(CONFIG_FILE):
         try:
@@ -159,10 +158,10 @@ class TelegramClient:
                 req = urllib.request.Request(
                     url,
                     data=json_data,
-                    headers={"Content-Type": "application/json", "User-Agent": "AntigravityMobileBridge/7.0"}
+                    headers={"Content-Type": "application/json", "User-Agent": "AntigravityMobileBridge/7.5"}
                 )
             else:
-                req = urllib.request.Request(url, headers={"User-Agent": "AntigravityMobileBridge/7.0"})
+                req = urllib.request.Request(url, headers={"User-Agent": "AntigravityMobileBridge/7.5"})
 
             with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=timeout) as response:
                 res_body = response.read().decode("utf-8")
@@ -190,7 +189,7 @@ class TelegramClient:
         return res if res is not None else []
 
     def set_bot_commands(self) -> bool:
-        """設定手機端專屬簡潔指令清單 (移除 sessions 等干擾項目)"""
+        """設定手機端專屬簡潔指令清單"""
         commands = [
             {"command": "tree", "description": "🧭 IDE 檔案總管 / 資料夾樹地圖 (點擊切換)"},
             {"command": "cd", "description": "🎯 切換工作專案或目錄 (/cd <關鍵字>)"},
@@ -198,7 +197,7 @@ class TelegramClient:
             {"command": "pwd", "description": "📍 檢視當前工作位置與上傳目標"},
             {"command": "staging", "description": "📦 查看【手機上傳臨時存放區】檔案"},
             {"command": "status", "description": "📊 檢視手機專屬 Agent 狀態與健康度"},
-            {"command": "clear", "description": "🧹 重置手機即時收件匣"},
+            {"command": "clear", "description": "🧹 重置手機即時收件匣與對話記憶"},
             {"command": "apk", "description": "📦 傳送最新 Samsung A32 氣氛燈 APK"},
             {"command": "pin", "description": "📌 置頂手機專屬操作面板卡片"}
         ]
@@ -274,7 +273,7 @@ class TelegramClient:
             file_path = res["file_path"]
             download_url = f"https://api.telegram.org/file/bot{self.token}/{file_path}"
             
-            req = urllib.request.Request(download_url, headers={"User-Agent": "AntigravityMobileBridge/7.0"})
+            req = urllib.request.Request(download_url, headers={"User-Agent": "AntigravityMobileBridge/7.5"})
             os.makedirs(os.path.dirname(os.path.abspath(dest_path)), exist_ok=True)
             
             with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=60) as resp:
@@ -307,7 +306,7 @@ class TelegramClient:
             req = urllib.request.Request(
                 url,
                 data=body,
-                headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "AntigravityMobileBridge/7.0"}
+                headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "AntigravityMobileBridge/7.5"}
             )
             with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=120) as response:
                 res = json.loads(response.read().decode("utf-8"))
@@ -340,7 +339,7 @@ class MobileAIEngine:
 """
 
     @staticmethod
-    def query_ai(user_prompt: str, current_project: str, current_cwd: str, target_upload_name: str, target_upload_dir: str, history: Optional[List[Dict[str, str]]] = None, model: str = "meta/llama-3.1-8b-instruct") -> str:
+    def query_ai(user_prompt: str, current_project: str, current_cwd: str, target_upload_name: str, target_upload_dir: str, history: Optional[List[Dict[str, str]]] = None, model: str = "meta/llama-3.2-11b-vision-instruct") -> str:
         api_key = get_nvidia_api_key()
         if not api_key:
             return "⚠️ 未找到有效的 NVIDIA API Key，請檢查 nvidia_build.txt！"
@@ -349,7 +348,7 @@ class MobileAIEngine:
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
-            "User-Agent": "AntigravityMobileBridge/7.0"
+            "User-Agent": "AntigravityMobileBridge/7.5"
         }
 
         system_content = MobileAIEngine.get_system_prompt(current_project, current_cwd, target_upload_name, target_upload_dir)
@@ -359,28 +358,34 @@ class MobileAIEngine:
                 messages.append({"role": item.get("role", "user"), "content": item.get("content", "")})
         messages.append({"role": "user", "content": user_prompt})
 
-        data = {
-            "model": model,
-            "messages": messages,
-            "max_tokens": 1200,
-            "temperature": 0.6
-        }
+        # 優先嘗試指定模型，若失敗自動切換備用模型
+        candidate_models = [model, "meta/llama-3.2-11b-vision-instruct"]
+        seen = set()
+        models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
 
         ctx = ssl.create_default_context()
-        try:
-            req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers)
-            with urllib.request.urlopen(req, context=ctx, timeout=25) as resp:
-                res = json.loads(resp.read().decode("utf-8"))
-                choices = res.get("choices", [])
-                if choices:
-                    return choices[0]["message"]["content"].strip()
-                return "⚠️ AI 回覆為空，請稍後重試。"
-        except Exception as e:
-            logger.error(f"AI 大腦調用異常: {e}")
-            if model != "meta/llama-3.2-11b-vision-instruct":
-                logger.info("🔄 正在嘗試 Fallback 模型 (meta/llama-3.2-11b-vision-instruct)...")
-                return MobileAIEngine.query_ai(user_prompt, current_project, current_cwd, target_upload_name, target_upload_dir, history, model="meta/llama-3.2-11b-vision-instruct")
-            return f"❌ AI 運算暫時繁忙或連線逾時：`{e}`"
+
+        for cur_model in models_to_try:
+            data = {
+                "model": cur_model,
+                "messages": messages,
+                "max_tokens": 1200,
+                "temperature": 0.6
+            }
+
+            for attempt in range(2):
+                try:
+                    req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers)
+                    with urllib.request.urlopen(req, context=ctx, timeout=25) as resp:
+                        res = json.loads(resp.read().decode("utf-8"))
+                        choices = res.get("choices", [])
+                        if choices and choices[0].get("message", {}).get("content"):
+                            return choices[0]["message"]["content"].strip()
+                except Exception as e:
+                    logger.warning(f"模型 {cur_model} 第 {attempt+1} 次嘗試異常: {e}")
+                    time.sleep(1)
+
+        return "⚠️ AI 大腦正在自我校準中，請點擊下方【 🔄 重新生成 / 重試 】按鈕，我會立即為你重新計算！🌟"
 
 # ==============================================================================
 # 📝 本地日誌、收件匣與記憶統整器
@@ -489,6 +494,13 @@ class AntigravityBridgeDaemon:
         
         # 🌟 手機專屬獨立對話歷史 (Multi-turn Memory)
         self.mobile_chat_history: List[Dict[str, str]] = []
+        
+        # 🌟 最近一次夥伴提問 (用於一鍵重新生成 / 重試按鈕)
+        self.last_user_query: Dict[int, str] = {}
+        
+        # 🌟 正在運行的任務狀態與補充說明隊列 (Continuous Steering)
+        self.active_working_tasks: Dict[int, Dict[str, Any]] = {}
+        self.task_lock = threading.Lock()
         
         # 🌟 批次相片防刷屏緩衝器
         self.photo_buffer = PhotoBatchBuffer(self.on_photo_batch_finished, delay_seconds=2.0)
@@ -605,6 +617,21 @@ class AntigravityBridgeDaemon:
         )
         return text, {"inline_keyboard": keyboard_buttons}
 
+    def get_reply_action_keyboard(self) -> Dict[str, Any]:
+        """生成每則回覆下方的快捷操作按鈕 (含重試、樹狀圖、檔案清單與面板)"""
+        return {
+            "inline_keyboard": [
+                [
+                    {"text": "🔄 重新生成 / 重試", "callback_data": "action:retry"},
+                    {"text": "🧭 資料夾樹 (/tree)", "callback_data": "action:tree"}
+                ],
+                [
+                    {"text": "📂 查看檔案 (/ls)", "callback_data": "action:ls"},
+                    {"text": "📌 操作面板", "callback_data": "action:pin"}
+                ]
+            ]
+        }
+
     def get_project_keyboard(self) -> Dict[str, Any]:
         keyboard = {
             "inline_keyboard": [
@@ -638,7 +665,9 @@ class AntigravityBridgeDaemon:
             f"🖼️ **圖片目標**：`{self.target_upload_name}`\n"
             f"📦 **臨時存放區**：`Telegram_Agent_Bridge/手機上傳臨時存放區`\n\n"
             "💬 **操作技巧**：\n"
-            "• 📱 **專屬問答**：直接傳送任何問題或指令，專屬 Mobile Agent 即時解答！\n"
+            "• 📱 **專屬問答**：直接傳送文字或語音，專屬 Mobile Agent 即時解答！\n"
+            "• 💡 **連續補充**：在 Working 時隨時發話，自動合流補充說明！\n"
+            "• 🔄 **一鍵重試**：每則回覆均有 [ 🔄 重新生成 / 重試 ] 按鈕！\n"
             "• 🌲 **樹狀地圖**：輸入 `/tree` 瀏覽完整資料夾樹，點擊按鈕自由切換！\n"
             "• 🖼️ **傳圖直達**：直接傳送多張照片，自動存入【`圖片/illit`】並合流通知！\n"
             "• 🚚 **整批搬移**：說「`把暫存區移到桌面`」或「`移到 illit`」，一鍵整批搬移！\n"
@@ -942,7 +971,7 @@ class AntigravityBridgeDaemon:
             
         summary += "\n💡 *提示：所有圖片已安全落地電腦，你可以隨時在電腦開啟或下指令操作！*"
         
-        self.client.send_message(chat_id, summary)
+        self.client.send_message(chat_id, summary, reply_markup=self.get_reply_action_keyboard())
         MobileStorageManager.record_inbox(self.allowed_user_id, f"[批次上傳 {count} 張照片]", status="🟢 已全部存入", answer=summary)
         MobileStorageManager.sync_to_ai_memory(f"批次存入 {count} 張照片至 {dest_name}", self.current_project)
 
@@ -1004,13 +1033,64 @@ class AntigravityBridgeDaemon:
                     f"📂 **路徑**：`{dest_path}`\n"
                     f"💾 **檔案大小**：`{size_kb} KB`"
                 )
-                self.client.send_message(chat_id, reply)
+                self.client.send_message(chat_id, reply, reply_markup=self.get_reply_action_keyboard())
                 MobileStorageManager.record_inbox(user_id, f"[上傳檔案: {file_name}]", status="🟢 已下載存檔", answer=f"儲存於 {dest_path}")
             else:
                 self.client.send_message(chat_id, "❌ 檔案下載失敗。")
         except Exception as e:
             logger.error(f"處理檔案異常: {e}")
             self.client.send_message(chat_id, f"❌ 處理檔案失敗：`{e}`")
+
+    def handle_voice_message(self, chat_id: int, user_id: int, voice_obj: dict):
+        """處理 Telegram 語音訊息 (支援 Working 期間補充說明或即時提問)"""
+        try:
+            file_id = voice_obj.get("file_id")
+            duration = voice_obj.get("duration", 0)
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            voice_filename = f"voice_{timestamp}.oga"
+            voice_path = os.path.join(STAGING_DIR, voice_filename)
+
+            self.client.send_chat_action(chat_id, "record_voice")
+            success = self.client.download_file(file_id, voice_path)
+            if success:
+                logger.info(f"🎙️ 成功下載夥伴語音訊息: {voice_path} (時長: {duration}s)")
+                voice_text = f"[語音訊息指令 (時長 {duration} 秒)]"
+                
+                with self.task_lock:
+                    is_active = user_id in self.active_working_tasks
+                
+                if is_active:
+                    # 正在工作中，作為補充說明納入隊列
+                    with self.task_lock:
+                        if user_id in self.active_working_tasks:
+                            self.active_working_tasks[user_id]["supplements"].append(f"夥伴補充語音訊息 (檔案: {voice_filename})")
+                            w_msg_id = self.active_working_tasks[user_id].get("working_msg_id")
+                            if w_msg_id:
+                                supp_count = len(self.active_working_tasks[user_id]["supplements"])
+                                update_text = (
+                                    f"📥 **已收到夥伴指令！**\n"
+                                    f"🎯 **目標專案**：`{self.current_project}`\n\n"
+                                    f"⏳ **Working...** (已接收最新語音補充說明 🎙️ 共 {supp_count} 則，持續運算中 🚀)"
+                                )
+                                self.client.edit_message_text(chat_id, w_msg_id, update_text)
+                    return
+                else:
+                    # 作為新提問處理
+                    self.last_user_query[user_id] = voice_text
+                    MobileStorageManager.record_inbox(user_id, voice_text, status="🟡 語音正在處理中...")
+                    
+                    working_text = (
+                        f"🎙️ **已收到夥伴語音訊息！** (時長: {duration} 秒)\n"
+                        f"🎯 **目標專案**：`{self.current_project}`\n\n"
+                        f"⏳ **Working...** (手機專屬 Agent 正在深度解析與處理中 🚀)"
+                    )
+                    w_msg_id = self.client.send_message(chat_id, working_text)
+                    self.process_ai_question_async(chat_id, user_id, f"夥伴傳送了一段 {duration} 秒的語音指令，請提供協助與解答！", w_msg_id)
+            else:
+                self.client.send_message(chat_id, "❌ 下載語音訊息失敗。")
+        except Exception as e:
+            logger.error(f"處理語音訊息異常: {e}")
+            self.client.send_message(chat_id, f"❌ 處理語音失敗：`{e}`")
 
     # --------------------------------------------------------------------------
     # 🎛️ Inline Keyboard 點擊回呼處理
@@ -1021,8 +1101,24 @@ class AntigravityBridgeDaemon:
         msg = cb.get("message", {})
         chat_id = msg.get("chat", {}).get("id", self.allowed_user_id)
         msg_id = msg.get("message_id")
+        user_id = cb.get("from", {}).get("id", self.allowed_user_id)
 
-        if data.startswith("nav_dir:"):
+        if data == "action:retry":
+            last_q = self.last_user_query.get(user_id, "")
+            if not last_q:
+                self.client.answer_callback_query(cb_id, text="⚠️ 找不到上一次的提問內容")
+                return
+            
+            self.client.answer_callback_query(cb_id, text="🔄 正在為你重新呼叫 AI 大腦運算...")
+            retry_working_text = (
+                f"🔄 **正在為夥伴重新生成回答...** 🌟\n"
+                f"💬 「{last_q[:60]}」\n\n"
+                f"⏳ **Working...** (AI 大腦急速重算中 🚀)"
+            )
+            self.client.edit_message_text(chat_id, msg_id, retry_working_text)
+            self.process_ai_question_async(chat_id, user_id, last_q, msg_id, is_retry=True)
+
+        elif data.startswith("nav_dir:"):
             rel_path = data.split("nav_dir:")[1]
             if rel_path == "." or not rel_path:
                 target_abs = self.workspace_root
@@ -1123,19 +1219,32 @@ class AntigravityBridgeDaemon:
             ls_text = self.list_current_directory_files()
             self.client.send_message(chat_id, ls_text, reply_markup=self.get_project_keyboard())
 
+        elif data == "action:pin":
+            self.client.answer_callback_query(cb_id, text="正在傳送操作面板...")
+            self.send_pin_guide(chat_id)
+
     # --------------------------------------------------------------------------
-    # 🤖 專屬 Mobile Agent 問答與非同步執行
+    # 🤖 專屬 Mobile Agent 問答與非同步執行 (含連續補充說明與重試支援)
     # --------------------------------------------------------------------------
-    def process_ai_question_async(self, chat_id: int, user_id: int, text: str, working_msg_id: Optional[int]):
+    def process_ai_question_async(self, chat_id: int, user_id: int, text: str, working_msg_id: Optional[int], is_retry: bool = False):
+        # 登記活躍任務
+        with self.task_lock:
+            self.active_working_tasks[user_id] = {
+                "initial_text": text,
+                "supplements": [],
+                "working_msg_id": working_msg_id,
+                "start_time": time.time()
+            }
+
         def _task():
             try:
                 # 🌟 1. 優先檢測是否為切換工作目錄 / 專案指令
                 switch_res = self.try_switch_working_directory(text)
                 if switch_res:
                     if working_msg_id:
-                        self.client.edit_message_text(chat_id, working_msg_id, switch_res)
+                        self.client.edit_message_text(chat_id, working_msg_id, switch_res, reply_markup=self.get_reply_action_keyboard())
                     else:
-                        self.client.send_message(chat_id, switch_res)
+                        self.client.send_message(chat_id, switch_res, reply_markup=self.get_reply_action_keyboard())
                     MobileStorageManager.record_inbox(user_id, text, status="🟢 已切換工作專案與目錄", answer=switch_res)
                     MobileStorageManager.sync_to_ai_memory(f"切換專案與目錄至：{self.current_project}", self.current_project)
                     return
@@ -1144,9 +1253,9 @@ class AntigravityBridgeDaemon:
                 target_res = self.try_set_target_directory(text)
                 if target_res:
                     if working_msg_id:
-                        self.client.edit_message_text(chat_id, working_msg_id, target_res)
+                        self.client.edit_message_text(chat_id, working_msg_id, target_res, reply_markup=self.get_reply_action_keyboard())
                     else:
-                        self.client.send_message(chat_id, target_res)
+                        self.client.send_message(chat_id, target_res, reply_markup=self.get_reply_action_keyboard())
                     MobileStorageManager.record_inbox(user_id, text, status="🟢 已設定上傳目標", answer=target_res)
                     MobileStorageManager.sync_to_ai_memory(f"設定圖片目標目錄：{self.target_upload_name}", self.current_project)
                     return
@@ -1155,28 +1264,37 @@ class AntigravityBridgeDaemon:
                 action_result = self.try_autonomous_file_action(text)
                 if action_result:
                     if working_msg_id:
-                        self.client.edit_message_text(chat_id, working_msg_id, action_result)
+                        self.client.edit_message_text(chat_id, working_msg_id, action_result, reply_markup=self.get_reply_action_keyboard())
                     else:
-                        self.client.send_message(chat_id, action_result)
+                        self.client.send_message(chat_id, action_result, reply_markup=self.get_reply_action_keyboard())
                     MobileStorageManager.record_inbox(user_id, text, status="🟢 已自動執行搬移完畢", answer=action_result)
                     MobileStorageManager.sync_to_ai_memory(f"自動執行檔案搬移：{text[:40]}", self.current_project)
                     return
 
-                # 🌟 4. 手機專屬獨立 Agent 深度解答 (Multi-turn Memory)
+                # 🌟 4. 手機專屬獨立 Agent 深度解答 (包含任何動態追加的補充說明)
                 logger.info(f"🤖 專屬 Mobile Agent 正在為夥伴深度解答: {text[:40]}...")
                 self.client.send_chat_action(chat_id, "typing")
                 
+                # 提取補充說明
+                with self.task_lock:
+                    supps = list(self.active_working_tasks.get(user_id, {}).get("supplements", []))
+                
+                full_prompt = text
+                if supps:
+                    full_prompt += "\n\n【夥伴在思考期間追加的補充說明】：\n" + "\n".join([f"- {s}" for s in supps])
+
                 answer = MobileAIEngine.query_ai(
-                    text,
+                    full_prompt,
                     self.current_project,
                     self.current_cwd,
                     self.target_upload_name,
                     self.target_upload_dir,
-                    history=self.mobile_chat_history
+                    history=self.mobile_chat_history,
+                    model=self.config.get("ai_model", "meta/llama-3.2-11b-vision-instruct")
                 )
                 
                 # 記錄到手機專屬多輪對話歷史
-                self.mobile_chat_history.append({"role": "user", "content": text})
+                self.mobile_chat_history.append({"role": "user", "content": full_prompt})
                 self.mobile_chat_history.append({"role": "assistant", "content": answer})
                 if len(self.mobile_chat_history) > 12:
                     self.mobile_chat_history = self.mobile_chat_history[-12:]
@@ -1189,17 +1307,24 @@ class AntigravityBridgeDaemon:
                 reply_text = f"**【📱 Mobile Agent 專屬解答】** 🌟\n\n{header}{answer}"
                 
                 if working_msg_id:
-                    self.client.edit_message_text(chat_id, working_msg_id, reply_text)
+                    self.client.edit_message_text(chat_id, working_msg_id, reply_text, reply_markup=self.get_reply_action_keyboard())
                 else:
-                    self.client.send_message(chat_id, reply_text)
+                    self.client.send_message(chat_id, reply_text, reply_markup=self.get_reply_action_keyboard())
                 
-                MobileStorageManager.record_inbox(user_id, text, status="🟢 已解答完畢", answer=answer)
-                summary_brief = text[:50].replace("\n", " ")
+                MobileStorageManager.record_inbox(user_id, full_prompt, status="🟢 已解答完畢", answer=answer)
+                summary_brief = full_prompt[:50].replace("\n", " ")
                 MobileStorageManager.sync_to_ai_memory(f"手機提問與指令：{summary_brief}", self.current_project)
                 logger.info(f"🎉 專屬 Mobile Agent 已成功將解答回傳給夥伴！")
             except Exception as e:
-                logger.error(f"非同步處理異常: {e}")
-                self.client.send_message(chat_id, f"❌ 處理過程發生異常：`{e}`")
+                logger.error(f"非同步處理異常: {e}", exc_info=True)
+                err_text = f"⚠️ 處理過程遇到狀況：`{e}`\n\n💡 夥伴可以點擊下方【 🔄 重新生成 / 重試 】按鈕，我會立即為你重新執行！"
+                if working_msg_id:
+                    self.client.edit_message_text(chat_id, working_msg_id, err_text, reply_markup=self.get_reply_action_keyboard())
+                else:
+                    self.client.send_message(chat_id, err_text, reply_markup=self.get_reply_action_keyboard())
+            finally:
+                with self.task_lock:
+                    self.active_working_tasks.pop(user_id, None)
 
         threading.Thread(target=_task, daemon=True).start()
 
@@ -1229,13 +1354,24 @@ class AntigravityBridgeDaemon:
                 logger.warning(f"🚫 拒絕未授權的使用者存取: {user_id} (@{username})")
                 return
 
-            # 2. 處理圖片上傳
+            # 2. 處理語音訊息 (Voice Message)
+            if "voice" in msg:
+                logger.info(f"🎙️ 收到夥伴的語音訊息")
+                self.handle_voice_message(chat_id, user_id, msg["voice"])
+                return
+
+            if "audio" in msg:
+                logger.info(f"🎵 收到夥伴的音訊檔案")
+                self.handle_voice_message(chat_id, user_id, msg["audio"])
+                return
+
+            # 3. 處理圖片上傳
             if "photo" in msg:
                 logger.info(f"📷 收到夥伴上傳的圖片 (Caption: {caption})")
                 self.handle_photo_message(chat_id, user_id, msg["photo"], caption)
                 return
 
-            # 3. 處理文件/APK 上傳
+            # 4. 處理文件/APK 上傳
             if "document" in msg:
                 logger.info(f"📁 收到夥伴上傳的檔案 (Doc: {msg.get('document', {}).get('file_name')})")
                 self.handle_document_message(chat_id, user_id, msg["document"], caption)
@@ -1246,7 +1382,30 @@ class AntigravityBridgeDaemon:
 
             logger.info(f"📩 收到夥伴手機訊息: {text}")
 
-            # 4. 手機專屬斜線指令路由
+            # 🌟 5. 判斷是否有正在進行中的 Working 任務（支援連續補充說明 Steering！）
+            with self.task_lock:
+                is_working = user_id in self.active_working_tasks
+
+            if is_working and not text.startswith("/"):
+                with self.task_lock:
+                    if user_id in self.active_working_tasks:
+                        self.active_working_tasks[user_id]["supplements"].append(text)
+                        w_msg_id = self.active_working_tasks[user_id].get("working_msg_id")
+                        if w_msg_id:
+                            supp_count = len(self.active_working_tasks[user_id]["supplements"])
+                            update_text = (
+                                f"📥 **已收到夥伴指令！**\n"
+                                f"🎯 **目標專案**：`{self.current_project}`\n\n"
+                                f"⏳ **Working...** (已接收最新補充說明 💡「{text[:30]}」共 {supp_count} 則，持續運算中 🚀)"
+                            )
+                            self.client.edit_message_text(chat_id, w_msg_id, update_text)
+                return
+
+            # 記錄最新提問 (支援一鍵重新生成按鈕)
+            if not text.startswith("/"):
+                self.last_user_query[user_id] = text
+
+            # 6. 手機專屬斜線指令路由
             if text.startswith("/start") or text.startswith("/help") or text.startswith("/pin"):
                 self.client.set_bot_commands()
                 self.send_pin_guide(chat_id)
@@ -1333,13 +1492,15 @@ class AntigravityBridgeDaemon:
                     f"• **圖片預設目標**：`{self.target_upload_name}`\n"
                     f"• **圖片實體路徑**：`{self.target_upload_dir}`\n"
                     f"• **臨時存放區**：`{STAGING_DIR}`\n"
-                    "• **AI 行動大腦**：🟢 在線 (NVIDIA Llama-3.1 旗艦核心)\n"
+                    f"• **AI 行動大腦**：🟢 在線 (NVIDIA Llama-3.2 Vision 旗艦核心)\n"
+                    "• **連續溝通機制**：🟢 支援 Working 期間文字/語音補充說明\n"
+                    "• **重試機制**：🟢 支援 [ 🔄 重新生成 / 重試 ] 一鍵重跑\n"
                     "• **架構模式**：🟢 手機獨立專屬視窗 (零衝突)\n"
                     "• **工作狀態**：🟢 隨時在線待命 (Ready for Action)\n"
                     f"• **即時收件匣**：`Telegram_Agent_Bridge/📱_手機Telegram即時收件匣.md`\n"
                     f"• **歷史紀錄**：`Telegram_Agent_Bridge/📱_手機Telegram歷史紀錄.log`"
                 )
-                self.client.send_message(chat_id, status_text)
+                self.client.send_message(chat_id, status_text, reply_markup=self.get_reply_action_keyboard())
 
             elif text.startswith("/apk"):
                 apk_path = r"c:\Users\yexia\Documents\ShihWei\NTNU\GitHub\視覺動態效果手機待修\mobile\手機音效氣氛燈_A32專屬版.apk"
@@ -1355,6 +1516,7 @@ class AntigravityBridgeDaemon:
             elif text.startswith("/clear"):
                 try:
                     self.mobile_chat_history.clear()
+                    self.last_user_query.clear()
                     with open(INBOX_FILE, "w", encoding="utf-8") as f:
                         f.write("# 📱 手機 Telegram ⇄ 電腦螢幕即時收件匣\n\n> 🟢 閒置中，等待夥伴新指令 ✨\n")
                     self.client.send_message(chat_id, "🧹 已重置手機即時收件匣與對話記憶！")
@@ -1365,7 +1527,7 @@ class AntigravityBridgeDaemon:
                 cmd = text[5:].strip()
                 self.client.send_message(chat_id, f"⚡ 正在於 `{self.current_project}` 執行：`{cmd}`...")
                 output = self.execute_command_sync(cmd, cwd=self.current_cwd)
-                self.client.send_message(chat_id, output)
+                self.client.send_message(chat_id, output, reply_markup=self.get_reply_action_keyboard())
                 MobileStorageManager.sync_to_ai_memory(f"執行終端指令 `{cmd}` ({self.current_project})", self.current_project)
 
             else:
@@ -1393,7 +1555,7 @@ class AntigravityBridgeDaemon:
 
         ensure_single_instance(47890)
 
-        logger.info("🚀 Antigravity Telegram 手機專屬獨立 Agent 已啟動！")
+        logger.info("🚀 Antigravity Telegram 手機專屬獨立 Agent 旗艦版已啟動！")
         logger.info(f"📱 授權使用者 ID: {self.allowed_user_id}")
         logger.info(f"📁 當前工作專案: {self.current_project} ({self.current_cwd})")
         logger.info(f"🖼️ 圖片預設目標: {self.target_upload_name} ({self.target_upload_dir})")

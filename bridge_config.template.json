@@ -6,5 +6,5 @@
     "target_upload_name": "🖼️ 圖片/illit",
     "auto_sync_agent_replies": false,
     "poll_interval_seconds": 1.0,
-    "ai_model": "meta/llama-3.1-8b-instruct"
+    "ai_model": "meta/llama-3.2-11b-vision-instruct"
 }
