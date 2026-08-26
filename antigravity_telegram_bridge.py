@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-📱 Antigravity Telegram Mobile Dedicated Agent (旗艦全能版)
+📱 Antigravity Telegram ⇄ Gemini 3.7 Flash 雙向智能體旗艦橋接器
 ========================================================================================
 ✨ 核心亮點升級：
-1. 🤖 旗艦 AI 思考大腦 (NVIDIA Llama-3.2 Vision 核心)：
-   - 採用最新活躍的 meta/llama-3.2-11b-vision-instruct 旗艦模型，徹底消除 410 / 逾時錯誤，秒級極速回應！
-2. 🔄 一鍵重新生成 / 重試按鈕 (One-Click Retry)：
+1. 🧠 雙層智能協同架構 (Dual-Layer Agentic Pipeline)：
+   - 輕量管理 (查目錄/搬移/終端/問答)：由手機端 Llama 3.2 11B 隨身管家秒回處理！
+   - 重度編程 (寫代碼/重構/編譯 APK)：自動委派至電腦端 Gemini 3.7 Flash 旗艦主腦，代碼零改壞！
+2. 📡 雙向成果自動監聽推播 (AgentOutboxWatcher)：
+   - 電腦端 Gemini 3.7 Flash 完成代碼修改與編譯後，自動將成果報告與最新 .apk 檔案秒傳回手機 Telegram！
+3. 🐳 本地零 Token 輕量工具協同 (CodeWhale Integration)：
+   - 支援 /codewhale 指令直接調用本機 codewhale.exe，完全 0 Token 支出！
+4. 🔄 一鍵重新生成 / 重試按鈕 (One-Click Retry)：
    - 每個回覆下方均附帶 [ 🔄 重新生成 / 重試 ] 按鈕，隨時一鍵重新呼叫大腦！
-3. 💬 工作中連續補充說明 (Continuous Steering Queue)：
+5. 💬 工作中連續補充說明 (Continuous Steering Queue)：
    - 在 Agent Working 時，夥伴可隨時發送文字或語音進行「補充說明」，系統自動合流納入當前大腦處理！
-4. 🎙️ 語音訊息全自動接收 (Voice Message Ingestion)：
-   - 支援手機 Telegram 語音輸入，自動下載存檔並即時納入指令處理！
-5. 📦 完整本機路徑隔離 (100% Isolated Storage)：
-   - 收件匣與歷史日誌獨立留存於 Telegram_Agent_Bridge/，不污染任何其他專案！
-6. 🌲 視覺化樹狀地圖 (/tree)：
+6. 🌲 互動式視覺化樹狀地圖 (/tree)：
    - 動態 ASCII 資料夾樹狀圖與 Telegram Inline Keyboard 自由深入、返回與切換專案！
 """
 
@@ -46,7 +47,7 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[logging.StreamHandler(sys.stdout)]
 )
-logger = logging.getLogger("AntigravityMobileBridge")
+logger = logging.getLogger("AntigravityDualBridge")
 
 # ==============================================================================
 # ⚙️ 配置檔案路徑與目錄定義 (100% 本地隔離)
@@ -67,6 +68,7 @@ DESKTOP_DIR = os.path.expanduser(r"~\Desktop")
 PICTURES_DIR = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Pictures")
 ILLIT_DIR = os.path.join(PICTURES_DIR, "illit")
 NVIDIA_KEY_FILE = os.path.join(WORKSPACE_DEFAULT, "nvidia_build.txt")
+CODEWHALE_EXE = os.path.join(WORKSPACE_DEFAULT, "任務", "02_AI編程智能體_ZeroToken_CodeWhale_RooCode", "CodeWhale", "codewhale.exe")
 
 os.makedirs(STAGING_DIR, exist_ok=True)
 os.makedirs(ILLIT_DIR, exist_ok=True)
@@ -94,7 +96,7 @@ def ensure_single_instance(port: int = 47890) -> bool:
         sys.exit(0)
 
 # ==============================================================================
-# 🔑 NVIDIA API Key 與設定檔管理
+# 🔑 API Key 與設定檔管理
 # ==============================================================================
 def get_nvidia_api_key() -> str:
     """自動讀取 NVIDIA API Key (支援環境變數、配置檔與本地密鑰檔)"""
@@ -120,7 +122,7 @@ def load_config() -> Dict[str, Any]:
         "current_project": "Telegram_Agent_Bridge",
         "target_upload_dir": ILLIT_DIR,
         "target_upload_name": "🖼️ 圖片/illit",
-        "auto_sync_agent_replies": False,
+        "auto_sync_agent_replies": True,
         "poll_interval_seconds": 1.0,
         "ai_model": "meta/llama-3.2-11b-vision-instruct"
     }
@@ -158,10 +160,10 @@ class TelegramClient:
                 req = urllib.request.Request(
                     url,
                     data=json_data,
-                    headers={"Content-Type": "application/json", "User-Agent": "AntigravityMobileBridge/7.5"}
+                    headers={"Content-Type": "application/json", "User-Agent": "AntigravityDualBridge/8.0"}
                 )
             else:
-                req = urllib.request.Request(url, headers={"User-Agent": "AntigravityMobileBridge/7.5"})
+                req = urllib.request.Request(url, headers={"User-Agent": "AntigravityDualBridge/8.0"})
 
             with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=timeout) as response:
                 res_body = response.read().decode("utf-8")
@@ -197,6 +199,7 @@ class TelegramClient:
             {"command": "pwd", "description": "📍 檢視當前工作位置與上傳目標"},
             {"command": "staging", "description": "📦 查看【手機上傳臨時存放區】檔案"},
             {"command": "status", "description": "📊 檢視手機專屬 Agent 狀態與健康度"},
+            {"command": "codewhale", "description": "🐳 本機零 Token 智能體執行指令"},
             {"command": "clear", "description": "🧹 重置手機即時收件匣與對話記憶"},
             {"command": "apk", "description": "📦 傳送最新 Samsung A32 氣氛燈 APK"},
             {"command": "pin", "description": "📌 置頂手機專屬操作面板卡片"}
@@ -273,7 +276,7 @@ class TelegramClient:
             file_path = res["file_path"]
             download_url = f"https://api.telegram.org/file/bot{self.token}/{file_path}"
             
-            req = urllib.request.Request(download_url, headers={"User-Agent": "AntigravityMobileBridge/7.5"})
+            req = urllib.request.Request(download_url, headers={"User-Agent": "AntigravityDualBridge/8.0"})
             os.makedirs(os.path.dirname(os.path.abspath(dest_path)), exist_ok=True)
             
             with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=60) as resp:
@@ -306,7 +309,7 @@ class TelegramClient:
             req = urllib.request.Request(
                 url,
                 data=body,
-                headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "AntigravityMobileBridge/7.5"}
+                headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "AntigravityDualBridge/8.0"}
             )
             with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=120) as response:
                 res = json.loads(response.read().decode("utf-8"))
@@ -316,13 +319,12 @@ class TelegramClient:
             return False
 
 # ==============================================================================
-# 🤖 手機專屬獨立 AI 思考大腦 (Mobile Dedicated Agent Brain)
+# 🤖 手機專屬輕量 AI 思考大腦 (Llama-3.2-Vision 隨身管家)
 # ==============================================================================
 class MobileAIEngine:
     @staticmethod
     def get_system_prompt(current_project: str, current_cwd: str, target_upload_name: str, target_upload_dir: str) -> str:
-        return f"""你是夥伴專屬的【📱 Antigravity 手機獨立 Agent】！
-你是一個常駐於手機 Telegram 上的隨身超級工程助手與管家。
+        return f"""你是夥伴專屬的【📱 Antigravity 手機隨身管家 Agent】！
 每次對話稱呼夥伴為「夥伴」。
 
 【回答風格與原則】：
@@ -331,7 +333,7 @@ class MobileAIEngine:
 3. 嚴格領域隔離：非物理話題禁止使用物理公式或比喻；專注回答夥伴當前交辦的軟體、檔案或工程任務。
 4. 軟體安全守則：絕不在未經夥伴明確授權下刪除重要系統檔案或軟體。
 
-【當前手機 Agent 操控環境】：
+【當前環境】：
 - 當前工作專案：{current_project}
 - 本地實體目錄：{current_cwd}
 - 預設存圖目標：{target_upload_name} ({target_upload_dir})
@@ -348,7 +350,7 @@ class MobileAIEngine:
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
-            "User-Agent": "AntigravityMobileBridge/7.5"
+            "User-Agent": "AntigravityDualBridge/8.0"
         }
 
         system_content = MobileAIEngine.get_system_prompt(current_project, current_cwd, target_upload_name, target_upload_dir)
@@ -358,7 +360,6 @@ class MobileAIEngine:
                 messages.append({"role": item.get("role", "user"), "content": item.get("content", "")})
         messages.append({"role": "user", "content": user_prompt})
 
-        # 優先嘗試指定模型，若失敗自動切換備用模型
         candidate_models = [model, "meta/llama-3.2-11b-vision-instruct"]
         seen = set()
         models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
@@ -392,11 +393,11 @@ class MobileAIEngine:
 # ==============================================================================
 class MobileStorageManager:
     @staticmethod
-    def record_inbox(user_id: int, message_text: str, status: str = "🟢 處理完成", answer: str = ""):
+    def record_inbox(user_id: int, message_text: str, project_name: str = "Telegram_Agent_Bridge", cwd: str = "", status: str = "🟢 處理完成", answer: str = "", is_heavy_task: bool = False):
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         
-        # 寫入歷史 Log 檔 (持久留存於 Telegram_Agent_Bridge 目錄內)
-        log_entry = f"[{timestamp}] [User: {user_id}]\n提問: {message_text}\n回覆: {answer[:200]}...\n{'-'*50}\n"
+        # 寫入歷史 Log 檔
+        log_entry = f"[{timestamp}] [User: {user_id}] [Project: {project_name}]\n提問: {message_text}\n狀態: {status}\n回覆: {answer[:200]}...\n{'-'*50}\n"
         try:
             with open(HISTORY_LOG_FILE, "a", encoding="utf-8") as f:
                 f.write(log_entry)
@@ -406,19 +407,22 @@ class MobileStorageManager:
         # 寫入電腦螢幕即時收件匣
         answer_block = ""
         if answer:
-            answer_block = f"### ✨ 專屬 Mobile Agent 回覆：\n```text\n{answer[:600]}...\n```\n\n"
+            answer_block = f"### ✨ Agent 執行結果：\n```text\n{answer[:800]}...\n```\n\n"
+
+        task_mode = "⚡ 重度編程任務 (委派電腦端 Gemini 3.7 Flash)" if is_heavy_task else "📱 隨身管家指令 (Llama-3.2-Vision)"
 
         inbox_content = (
             "# 📱 手機 Telegram ⇄ 電腦螢幕即時收件匣\n\n"
             f"> 🕒 **時間**：`{timestamp}` | 狀態：`{status}`\n"
-            f"> 🎯 **模式**：`📱 手機專屬獨立 Agent`\n\n"
+            f"> 🎯 **模式**：`{task_mode}`\n"
+            f"> 📁 **目標專案**：`{project_name}` (`{cwd}`)\n\n"
             "### 💬 夥伴手機最新指令與提問：\n"
             "```text\n"
             f"{message_text}\n"
             "```\n\n"
             f"{answer_block}"
             "---\n"
-            "💡 *提示：本檔案位於 Telegram_Agent_Bridge/，隨時呈現手機端最新動態。*\n"
+            "💡 *提示：電腦端 Gemini 3.7 Flash 完成任務並更新此檔案後，Bridge 會自動把成果與 APK 秒傳回手機！*\n"
         )
         try:
             with open(INBOX_FILE, "w", encoding="utf-8") as f:
@@ -469,7 +473,7 @@ class PhotoBatchBuffer:
             self.flush_callback(batch)
 
 # ==============================================================================
-# 🎮 手機專屬獨立 Agent 橋接核心 (Antigravity Mobile Bridge Daemon)
+# 🎮 雙向智能體橋接核心 (Antigravity Dual Bridge Daemon)
 # ==============================================================================
 class AntigravityBridgeDaemon:
     def __init__(self):
@@ -492,18 +496,88 @@ class AntigravityBridgeDaemon:
         self.target_upload_name = self.config.get("target_upload_name", "🖼️ 圖片/illit")
         os.makedirs(self.target_upload_dir, exist_ok=True)
         
-        # 🌟 手機專屬獨立對話歷史 (Multi-turn Memory)
+        # 🌟 手機專屬獨立對話歷史
         self.mobile_chat_history: List[Dict[str, str]] = []
         
-        # 🌟 最近一次夥伴提問 (用於一鍵重新生成 / 重試按鈕)
+        # 🌟 最近一次夥伴提問
         self.last_user_query: Dict[int, str] = {}
         
-        # 🌟 正在運行的任務狀態與補充說明隊列 (Continuous Steering)
+        # 🌟 正在運行的任務狀態與補充說明隊列
         self.active_working_tasks: Dict[int, Dict[str, Any]] = {}
         self.task_lock = threading.Lock()
         
+        # 🌟 收件匣監聽最後記錄 (用於自動推播 Gemini 3.7 執行成果)
+        self.last_inbox_mtime = 0.0
+        self.last_pushed_answer = ""
+        
         # 🌟 批次相片防刷屏緩衝器
         self.photo_buffer = PhotoBatchBuffer(self.on_photo_batch_finished, delay_seconds=2.0)
+
+    # --------------------------------------------------------------------------
+    # 📡 雙向成果監聽線程 (AgentOutboxWatcher)
+    # --------------------------------------------------------------------------
+    def start_outbox_watcher_thread(self):
+        """背景持續監聽電腦端 Gemini 3.7 Flash 寫入的成果報告與新編譯 APK"""
+        def _watcher():
+            logger.info("📡 雙向成果監聽線程 (AgentOutboxWatcher) 已啟動！")
+            if os.path.exists(INBOX_FILE):
+                self.last_inbox_mtime = os.path.getmtime(INBOX_FILE)
+
+            while self.running:
+                try:
+                    if self.allowed_user_id and os.path.exists(INBOX_FILE):
+                        mtime = os.path.getmtime(INBOX_FILE)
+                        if mtime > self.last_inbox_mtime:
+                            self.last_inbox_mtime = mtime
+                            with open(INBOX_FILE, "r", encoding="utf-8", errors="replace") as f:
+                                content = f.read()
+
+                            # 檢測是否有電腦端 Agent 剛寫入的完成結果
+                            if "### ✨ Agent 執行結果：" in content and "狀態：`🟢" in content:
+                                try:
+                                    ans_part = content.split("### ✨ Agent 執行結果：")[1].split("---")[0].strip()
+                                    if ans_part and ans_part != self.last_pushed_answer:
+                                        self.last_pushed_answer = ans_part
+                                        logger.info("🎉 偵測到電腦端 Gemini 3.7 Flash 執行完畢，自動推播至手機 Telegram...")
+                                        
+                                        push_text = (
+                                            "🎉 **【電腦端 Gemini 3.7 Flash 旗艦主腦執行完成】** 🌟\n"
+                                            "━━━━━━━━━━━━━━━━━━━━━\n"
+                                            f"📍 **專案**：`{self.current_project}`\n\n"
+                                            f"{ans_part}\n\n"
+                                            "💡 *提示：所有程式碼與工程變更已在電腦端落實生效！*"
+                                        )
+                                        self.client.send_message(self.allowed_user_id, push_text, reply_markup=self.get_reply_action_keyboard())
+                                        
+                                        # 自動檢查是否有 2 分鐘內剛編譯生成的最新 APK
+                                        self._auto_check_and_send_new_apk(self.allowed_user_id)
+                                except Exception as err:
+                                    logger.debug(f"解析收件匣成果失敗: {err}")
+
+                except Exception as e:
+                    logger.debug(f"監聽線程輪詢異常: {e}")
+                time.sleep(2)
+
+        t = threading.Thread(target=_watcher, daemon=True)
+        t.start()
+
+    def _auto_check_and_send_new_apk(self, chat_id: int):
+        """自動掃描工作區是否有剛剛編譯出的 APK 並秒傳手機"""
+        try:
+            apk_candidates = [
+                os.path.join(self.workspace_root, "視覺動態效果手機待修", "mobile", "手機音效氣氛燈_A32專屬版.apk"),
+                os.path.join(self.workspace_root, "FB_adblock.apk")
+            ]
+            now = time.time()
+            for apk in apk_candidates:
+                if os.path.exists(apk):
+                    apk_mtime = os.path.getmtime(apk)
+                    if now - apk_mtime < 120:  # 2 分鐘內新產生的 APK
+                        logger.info(f"📦 偵測到最新編譯的 APK ({apk})，自動傳送至 Telegram...")
+                        self.client.send_document(chat_id, apk, "✨ 這是電腦端 Gemini 3.7 Flash 剛剛編譯產出的最新 APK 安裝包！")
+                        break
+        except Exception as e:
+            logger.debug(f"自動傳送 APK 失敗: {e}")
 
     # --------------------------------------------------------------------------
     # 🌲 視覺化樹狀圖生成與導航按鈕
@@ -618,7 +692,7 @@ class AntigravityBridgeDaemon:
         return text, {"inline_keyboard": keyboard_buttons}
 
     def get_reply_action_keyboard(self) -> Dict[str, Any]:
-        """生成每則回覆下方的快捷操作按鈕 (含重試、樹狀圖、檔案清單與面板)"""
+        """生成每則回覆下方的快捷操作按鈕"""
         return {
             "inline_keyboard": [
                 [
@@ -658,21 +732,21 @@ class AntigravityBridgeDaemon:
 
     def send_pin_guide(self, chat_id: int):
         guide_text = (
-            "📌 **【Antigravity 手機專屬獨立 Agent】** 🌟\n"
+            "📌 **【Antigravity 雙向 Agent 隨身指揮中樞】** 🌟\n"
             "━━━━━━━━━━━━━━━━━━━━━\n"
             f"🎯 **當前專案**：`{self.current_project}`\n"
             f"📁 **工作目錄**：`{self.current_cwd}`\n"
             f"🖼️ **圖片目標**：`{self.target_upload_name}`\n"
             f"📦 **臨時存放區**：`Telegram_Agent_Bridge/手機上傳臨時存放區`\n\n"
             "💬 **操作技巧**：\n"
-            "• 📱 **專屬問答**：直接傳送文字或語音，專屬 Mobile Agent 即時解答！\n"
-            "• 💡 **連續補充**：在 Working 時隨時發話，自動合流補充說明！\n"
-            "• 🔄 **一鍵重試**：每則回覆均有 [ 🔄 重新生成 / 重試 ] 按鈕！\n"
+            "• ⚡ **重度編程**：說「幫我重構/寫程式/加功能」，自動委派電腦端 **Gemini 3.7 Flash** 執行！\n"
+            "• 📱 **隨身管家**：直接傳送問答、語音或搬移指令，秒級自治完成！\n"
             "• 🌲 **樹狀地圖**：輸入 `/tree` 瀏覽完整資料夾樹，點擊按鈕自由切換！\n"
             "• 🖼️ **傳圖直達**：直接傳送多張照片，自動存入【`圖片/illit`】並合流通知！\n"
             "• 🚚 **整批搬移**：說「`把暫存區移到桌面`」或「`移到 illit`」，一鍵整批搬移！\n"
             "• 📂 **查看檔案**：輸入 `/ls` 列出當前專案所有檔案\n"
             "• ⚡ **執行指令**：輸入 `/run <PowerShell指令>` 遠端操盤\n"
+            "• 🐳 **CodeWhale**：輸入 `/codewhale <指令>` 調用本機零 Token 智能體！\n"
             "• 📦 **傳送 APK**：輸入 `/apk` 秒傳最新安裝包！\n"
             "━━━━━━━━━━━━━━━━━━━━━"
         )
@@ -711,13 +785,13 @@ class AntigravityBridgeDaemon:
             if rel_p.lower() == q:
                 return abs_p, rel_p
                 
-        # 2. 結尾目錄完全比對 (例如 "mobile" 匹配至 "視覺動態效果/mobile")
+        # 2. 結尾目錄完全比對
         for abs_p, rel_p in all_dirs:
             folder_name = os.path.basename(abs_p).lower()
             if folder_name == q:
                 return abs_p, rel_p
                 
-        # 3. 關鍵字複合比對 (例如 "視覺" 與 "mobile")
+        # 3. 關鍵字複合比對
         tokens = [t for t in q.replace("/", " ").replace("\\", " ").split() if len(t) > 1]
         if tokens:
             for abs_p, rel_p in all_dirs:
@@ -943,6 +1017,18 @@ class AntigravityBridgeDaemon:
         except Exception as e:
             return f"❌ **執行發生異常**: `{e}`"
 
+    def execute_codewhale_sync(self, query: str) -> str:
+        """調用本地 CodeWhale 智能體執行輕量任務"""
+        if not os.path.exists(CODEWHALE_EXE):
+            return f"⚠️ 未找到 CodeWhale 執行檔：`{CODEWHALE_EXE}`\n你可以直接使用 `/run <指令>` 或交由電腦端 Gemini 3.7 主腦處理！"
+        
+        try:
+            logger.info(f"🐳 正在調用本地 CodeWhale 執行: {query[:30]}...")
+            cmd = f'& "{CODEWHALE_EXE}" -p "{query}"'
+            return self.execute_command_sync(cmd, cwd=self.current_cwd)
+        except Exception as e:
+            return f"❌ CodeWhale 執行異常：`{e}`"
+
     # --------------------------------------------------------------------------
     # 📷 相片與檔案處理
     # --------------------------------------------------------------------------
@@ -972,7 +1058,7 @@ class AntigravityBridgeDaemon:
         summary += "\n💡 *提示：所有圖片已安全落地電腦，你可以隨時在電腦開啟或下指令操作！*"
         
         self.client.send_message(chat_id, summary, reply_markup=self.get_reply_action_keyboard())
-        MobileStorageManager.record_inbox(self.allowed_user_id, f"[批次上傳 {count} 張照片]", status="🟢 已全部存入", answer=summary)
+        MobileStorageManager.record_inbox(self.allowed_user_id, f"[批次上傳 {count} 張照片]", project_name=self.current_project, cwd=target_dir, status="🟢 已全部存入", answer=summary)
         MobileStorageManager.sync_to_ai_memory(f"批次存入 {count} 張照片至 {dest_name}", self.current_project)
 
     def handle_photo_message(self, chat_id: int, user_id: int, photo_list: list, caption: str):
@@ -1034,7 +1120,7 @@ class AntigravityBridgeDaemon:
                     f"💾 **檔案大小**：`{size_kb} KB`"
                 )
                 self.client.send_message(chat_id, reply, reply_markup=self.get_reply_action_keyboard())
-                MobileStorageManager.record_inbox(user_id, f"[上傳檔案: {file_name}]", status="🟢 已下載存檔", answer=f"儲存於 {dest_path}")
+                MobileStorageManager.record_inbox(user_id, f"[上傳檔案: {file_name}]", project_name=self.current_project, cwd=target_dir, status="🟢 已下載存檔", answer=f"儲存於 {dest_path}")
             else:
                 self.client.send_message(chat_id, "❌ 檔案下載失敗。")
         except Exception as e:
@@ -1042,7 +1128,7 @@ class AntigravityBridgeDaemon:
             self.client.send_message(chat_id, f"❌ 處理檔案失敗：`{e}`")
 
     def handle_voice_message(self, chat_id: int, user_id: int, voice_obj: dict):
-        """處理 Telegram 語音訊息 (支援 Working 期間補充說明或即時提問)"""
+        """處理 Telegram 語音訊息"""
         try:
             file_id = voice_obj.get("file_id")
             duration = voice_obj.get("duration", 0)
@@ -1060,7 +1146,6 @@ class AntigravityBridgeDaemon:
                     is_active = user_id in self.active_working_tasks
                 
                 if is_active:
-                    # 正在工作中，作為補充說明納入隊列
                     with self.task_lock:
                         if user_id in self.active_working_tasks:
                             self.active_working_tasks[user_id]["supplements"].append(f"夥伴補充語音訊息 (檔案: {voice_filename})")
@@ -1075,9 +1160,8 @@ class AntigravityBridgeDaemon:
                                 self.client.edit_message_text(chat_id, w_msg_id, update_text)
                     return
                 else:
-                    # 作為新提問處理
                     self.last_user_query[user_id] = voice_text
-                    MobileStorageManager.record_inbox(user_id, voice_text, status="🟡 語音正在處理中...")
+                    MobileStorageManager.record_inbox(user_id, voice_text, project_name=self.current_project, cwd=self.current_cwd, status="🟡 語音正在處理中...")
                     
                     working_text = (
                         f"🎙️ **已收到夥伴語音訊息！** (時長: {duration} 秒)\n"
@@ -1224,8 +1308,18 @@ class AntigravityBridgeDaemon:
             self.send_pin_guide(chat_id)
 
     # --------------------------------------------------------------------------
-    # 🤖 專屬 Mobile Agent 問答與非同步執行 (含連續補充說明與重試支援)
+    # 🤖 雙層任務處理 (隨身管家 vs 電腦端 Gemini 3.7 重度編程委派)
     # --------------------------------------------------------------------------
+    def is_heavy_coding_task(self, text: str) -> bool:
+        """智慧判斷是否為重度代碼編程/APP開發任務"""
+        heavy_keywords = [
+            "寫程式", "寫代碼", "重構", "開發", "修改程式碼", "加功能", "修改代碼",
+            "build apk", "編譯apk", "編譯 apk", "寫一個app", "寫一個 app", "設計app",
+            "修復bug", "修bug", "改寫", "實作", "寫入檔案", "建立專案"
+        ]
+        t = text.lower()
+        return any(k in t for k in heavy_keywords)
+
     def process_ai_question_async(self, chat_id: int, user_id: int, text: str, working_msg_id: Optional[int], is_retry: bool = False):
         # 登記活躍任務
         with self.task_lock:
@@ -1245,7 +1339,7 @@ class AntigravityBridgeDaemon:
                         self.client.edit_message_text(chat_id, working_msg_id, switch_res, reply_markup=self.get_reply_action_keyboard())
                     else:
                         self.client.send_message(chat_id, switch_res, reply_markup=self.get_reply_action_keyboard())
-                    MobileStorageManager.record_inbox(user_id, text, status="🟢 已切換工作專案與目錄", answer=switch_res)
+                    MobileStorageManager.record_inbox(user_id, text, project_name=self.current_project, cwd=self.current_cwd, status="🟢 已切換工作專案與目錄", answer=switch_res)
                     MobileStorageManager.sync_to_ai_memory(f"切換專案與目錄至：{self.current_project}", self.current_project)
                     return
 
@@ -1256,7 +1350,7 @@ class AntigravityBridgeDaemon:
                         self.client.edit_message_text(chat_id, working_msg_id, target_res, reply_markup=self.get_reply_action_keyboard())
                     else:
                         self.client.send_message(chat_id, target_res, reply_markup=self.get_reply_action_keyboard())
-                    MobileStorageManager.record_inbox(user_id, text, status="🟢 已設定上傳目標", answer=target_res)
+                    MobileStorageManager.record_inbox(user_id, text, project_name=self.current_project, cwd=self.current_cwd, status="🟢 已設定上傳目標", answer=target_res)
                     MobileStorageManager.sync_to_ai_memory(f"設定圖片目標目錄：{self.target_upload_name}", self.current_project)
                     return
 
@@ -1267,15 +1361,51 @@ class AntigravityBridgeDaemon:
                         self.client.edit_message_text(chat_id, working_msg_id, action_result, reply_markup=self.get_reply_action_keyboard())
                     else:
                         self.client.send_message(chat_id, action_result, reply_markup=self.get_reply_action_keyboard())
-                    MobileStorageManager.record_inbox(user_id, text, status="🟢 已自動執行搬移完畢", answer=action_result)
+                    MobileStorageManager.record_inbox(user_id, text, project_name=self.current_project, cwd=self.current_cwd, status="🟢 已自動執行搬移完畢", answer=action_result)
                     MobileStorageManager.sync_to_ai_memory(f"自動執行檔案搬移：{text[:40]}", self.current_project)
                     return
 
-                # 🌟 4. 手機專屬獨立 Agent 深度解答 (包含任何動態追加的補充說明)
-                logger.info(f"🤖 專屬 Mobile Agent 正在為夥伴深度解答: {text[:40]}...")
+                # 🌟 4. 判斷是否為「重度編程任務」：自動委派電腦端 Gemini 3.7 Flash 主腦！
+                if self.is_heavy_coding_task(text):
+                    logger.info(f"⚡ 識別為重度編程任務，自動委派至電腦端 Gemini 3.7 Flash: {text[:40]}...")
+                    
+                    with self.task_lock:
+                        supps = list(self.active_working_tasks.get(user_id, {}).get("supplements", []))
+                    
+                    full_prompt = text
+                    if supps:
+                        full_prompt += "\n\n【夥伴追加的補充說明】：\n" + "\n".join([f"- {s}" for s in supps])
+
+                    # 寫入收件匣，標記為等待電腦端 Gemini 3.7 執行
+                    MobileStorageManager.record_inbox(
+                        user_id,
+                        full_prompt,
+                        project_name=self.current_project,
+                        cwd=self.current_cwd,
+                        status="🟡 等待電腦端 Gemini 3.7 Flash 執行中...",
+                        answer="任務已排入電腦端主腦佇列，編程完成後將自動回傳代碼報告與 APK！",
+                        is_heavy_task=True
+                    )
+                    
+                    delegate_msg = (
+                        "📥 **【已接收重度編程任務！⚡】** 🌟\n"
+                        "━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"🎯 **委派對象**：`💻 電腦端 Gemini 3.7 Flash 旗艦主腦`\n"
+                        f"📁 **工作專案**：`{self.current_project}`\n"
+                        f"💬 **任務指令**：「{full_prompt[:80]}」\n\n"
+                        "⏳ **電腦端主腦已開始深度編程與處理...**\n"
+                        "💡 *完成後會自動將代碼報告與最新編譯出的 .apk 秒傳回手機！* 🚀"
+                    )
+                    if working_msg_id:
+                        self.client.edit_message_text(chat_id, working_msg_id, delegate_msg, reply_markup=self.get_reply_action_keyboard())
+                    else:
+                        self.client.send_message(chat_id, delegate_msg, reply_markup=self.get_reply_action_keyboard())
+                    return
+
+                # 🌟 5. 一般隨身管家問答 (Llama 3.2 Vision 核心秒回)
+                logger.info(f"🤖 隨身管家正在為夥伴解答: {text[:40]}...")
                 self.client.send_chat_action(chat_id, "typing")
                 
-                # 提取補充說明
                 with self.task_lock:
                     supps = list(self.active_working_tasks.get(user_id, {}).get("supplements", []))
                 
@@ -1293,7 +1423,6 @@ class AntigravityBridgeDaemon:
                     model=self.config.get("ai_model", "meta/llama-3.2-11b-vision-instruct")
                 )
                 
-                # 記錄到手機專屬多輪對話歷史
                 self.mobile_chat_history.append({"role": "user", "content": full_prompt})
                 self.mobile_chat_history.append({"role": "assistant", "content": answer})
                 if len(self.mobile_chat_history) > 12:
@@ -1304,14 +1433,14 @@ class AntigravityBridgeDaemon:
                     f"📂 `{self.current_cwd}`\n"
                     "━━━━━━━━━━━━━━━━━━━━━\n\n"
                 )
-                reply_text = f"**【📱 Mobile Agent 專屬解答】** 🌟\n\n{header}{answer}"
+                reply_text = f"**【📱 Mobile Agent 隨身解答】** 🌟\n\n{header}{answer}"
                 
                 if working_msg_id:
                     self.client.edit_message_text(chat_id, working_msg_id, reply_text, reply_markup=self.get_reply_action_keyboard())
                 else:
                     self.client.send_message(chat_id, reply_text, reply_markup=self.get_reply_action_keyboard())
                 
-                MobileStorageManager.record_inbox(user_id, full_prompt, status="🟢 已解答完畢", answer=answer)
+                MobileStorageManager.record_inbox(user_id, full_prompt, project_name=self.current_project, cwd=self.current_cwd, status="🟢 已解答完畢", answer=answer)
                 summary_brief = full_prompt[:50].replace("\n", " ")
                 MobileStorageManager.sync_to_ai_memory(f"手機提問與指令：{summary_brief}", self.current_project)
                 logger.info(f"🎉 專屬 Mobile Agent 已成功將解答回傳給夥伴！")
@@ -1484,18 +1613,26 @@ class AntigravityBridgeDaemon:
                 content = self.read_file_content(filename, cwd=self.current_cwd)
                 self.client.send_message(chat_id, content)
 
+            elif text.startswith("/codewhale "):
+                cmd_query = text[11:].strip()
+                self.client.send_message(chat_id, f"🐳 正在調用本地 CodeWhale 執行：`{cmd_query}`...")
+                output = self.execute_codewhale_sync(cmd_query)
+                self.client.send_message(chat_id, output, reply_markup=self.get_reply_action_keyboard())
+                MobileStorageManager.sync_to_ai_memory(f"CodeWhale 執行 `{cmd_query}` ({self.current_project})", self.current_project)
+
             elif text.startswith("/status"):
                 status_text = (
-                    "📱 **手機專屬獨立 Agent 狀態報告** 🌟\n\n"
+                    "📱 **Antigravity 雙向 Agent 狀態報告** 🌟\n\n"
                     f"• **當前工作專案**：`{self.current_project}`\n"
                     f"• **實體工作目錄**：`{self.current_cwd}`\n"
                     f"• **圖片預設目標**：`{self.target_upload_name}`\n"
                     f"• **圖片實體路徑**：`{self.target_upload_dir}`\n"
                     f"• **臨時存放區**：`{STAGING_DIR}`\n"
-                    f"• **AI 行動大腦**：🟢 在線 (NVIDIA Llama-3.2 Vision 旗艦核心)\n"
+                    "• **隨身管家大腦**：🟢 在線 (Llama-3.2 Vision 核心)\n"
+                    "• **重度編程主腦**：🟢 電腦端 Gemini 3.7 Flash 聯動中\n"
+                    "• **雙向成果推播**：🟢 AgentOutboxWatcher 即時監聽\n"
                     "• **連續溝通機制**：🟢 支援 Working 期間文字/語音補充說明\n"
                     "• **重試機制**：🟢 支援 [ 🔄 重新生成 / 重試 ] 一鍵重跑\n"
-                    "• **架構模式**：🟢 手機獨立專屬視窗 (零衝突)\n"
                     "• **工作狀態**：🟢 隨時在線待命 (Ready for Action)\n"
                     f"• **即時收件匣**：`Telegram_Agent_Bridge/📱_手機Telegram即時收件匣.md`\n"
                     f"• **歷史紀錄**：`Telegram_Agent_Bridge/📱_手機Telegram歷史紀錄.log`"
@@ -1503,9 +1640,9 @@ class AntigravityBridgeDaemon:
                 self.client.send_message(chat_id, status_text, reply_markup=self.get_reply_action_keyboard())
 
             elif text.startswith("/apk"):
-                apk_path = r"c:\Users\yexia\Documents\ShihWei\NTNU\GitHub\視覺動態效果手機待修\mobile\手機音效氣氛燈_A32專屬版.apk"
+                apk_path = os.path.join(self.workspace_root, "視覺動態效果手機待修", "mobile", "手機音效氣氛燈_A32專屬版.apk")
                 if not os.path.exists(apk_path):
-                    alt_apk = r"c:\Users\yexia\Documents\ShihWei\NTNU\GitHub\FB_adblock.apk"
+                    alt_apk = os.path.join(self.workspace_root, "FB_adblock.apk")
                     if os.path.exists(alt_apk):
                         apk_path = alt_apk
                 self.client.send_message(chat_id, "📦 正在從電腦傳送最新 APK 安裝包...")
@@ -1532,13 +1669,16 @@ class AntigravityBridgeDaemon:
 
             else:
                 # 🌟 自然語言提問或行動指令
-                MobileStorageManager.record_inbox(user_id, text, status="🟡 正在處理中...")
+                is_heavy = self.is_heavy_coding_task(text)
+                MobileStorageManager.record_inbox(user_id, text, project_name=self.current_project, cwd=self.current_cwd, status="🟡 正在處理中...", is_heavy_task=is_heavy)
                 
+                target_desc = "💻 電腦端 Gemini 3.7 主腦" if is_heavy else "📱 隨身管家 Agent"
                 clean_reply = (
                     f"📥 **已收到夥伴指令！**\n"
-                    f"🎯 **目標專案**：`{self.current_project}`\n"
+                    f"🎯 **處理模式**：`{target_desc}`\n"
+                    f"📁 **目標專案**：`{self.current_project}`\n"
                     f"💬 「{text}」\n\n"
-                    f"⏳ **Working...** (手機專屬 Agent 正在處理中 🚀)"
+                    f"⏳ **Working...** (正在為你處理中 🚀)"
                 )
                 working_msg_id = self.client.send_message(chat_id, clean_reply)
                 self.client.send_chat_action(chat_id, "typing")
@@ -1555,7 +1695,7 @@ class AntigravityBridgeDaemon:
 
         ensure_single_instance(47890)
 
-        logger.info("🚀 Antigravity Telegram 手機專屬獨立 Agent 旗艦版已啟動！")
+        logger.info("🚀 Antigravity Telegram ⇄ Gemini 3.7 雙向智能體橋接器已啟動！")
         logger.info(f"📱 授權使用者 ID: {self.allowed_user_id}")
         logger.info(f"📁 當前工作專案: {self.current_project} ({self.current_cwd})")
         logger.info(f"🖼️ 圖片預設目標: {self.target_upload_name} ({self.target_upload_dir})")
@@ -1564,6 +1704,9 @@ class AntigravityBridgeDaemon:
             self.client.set_bot_commands()
         except Exception as e:
             logger.warning(f"註冊選單失敗: {e}")
+
+        # 啟動雙向成果監聽線程
+        self.start_outbox_watcher_thread()
 
         offset = 0
         while self.running:
