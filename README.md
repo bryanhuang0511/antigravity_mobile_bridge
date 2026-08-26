@@ -1,15 +1,18 @@
-# 🤖 Antigravity Mobile Agent Bridge (Telegram ⇄ PC Agent)
+# 📱 Antigravity Mobile Agent Bridge (Telegram ⇄ PC Dedicated Agent)
 
 > 🚀 **隨身操控開機中的電腦 Agent，徹底擺脫雲端 Spark 額度限制！**  
-> 透過 Telegram 手機 App 直接下達指令、長按引用回覆精準分流多個 Agent、批次接收照片與 APK 檔案。
+> 透過 Telegram 手機 App 直接下達指令、手機專屬獨立 Agent 深度對話、視覺化資料夾樹狀圖導航、批次接收照片與 APK 檔案。
 
 ---
 
 ## 🌟 核心特色 (Key Features)
 
-- 📱 **手機端無縫操作**：支援 iOS / Android Telegram 官方 App，出門在外隨時隨地交辦任務。
-- 🎯 **長按引用回覆精準分流 (Reply-To Precision Routing)**：
-  - 電腦端多個 Agent 同時運作並推播時，手機端只需「長按訊息點選回覆」，系統自動將指令送往該專屬 Agent（如鈣鈦礦、任務、手機維修等），絕不混淆！
+- 📱 **手機端專屬獨立 Agent (Dedicated Mobile Agent)**：
+  - 手機端具備獨立的多輪對話記憶與專屬視窗，問答純淨直達，不與電腦端其他視窗衝突！
+- 📦 **100% 本地路徑隔離 (Clean Local Storage Isolation)**：
+  - 即時收件匣、歷史紀錄 Log、手機上傳臨時存放區全面收納於本專案目錄內，不污染 `任務` 或其他專案！
+- 🧭 **互動式視覺化樹狀地圖 (`/tree`)**：
+  - 動態生成 ASCII 樹狀圖，搭配 Telegram Inline Keyboard 實現一鍵層層深入子資料夾、返回上一層與切換專案！
 - 🔕 **相片批次合流防刷屏 (Debounce Buffer)**：
   - 手機連傳多張照片時，自動合流為 1 則乾淨匯總卡片，杜絕通知轟炸。
 - 🚚 **自動檔案搬移與目標記憶**：
@@ -23,12 +26,15 @@
 ## 📂 專案結構 (Directory Structure)
 
 ```text
-antigravity_mobile_bridge/
+Telegram_Agent_Bridge/
 ├── antigravity_telegram_bridge.py   # 核心橋接器守護進程 (Python)
-├── bridge_config.template.json      # 配置檔範本 (複製為 bridge_config.json)
+├── bridge_config.json               # 橋接器設定檔 (Token、路徑與參數)
+├── bridge_config.template.json      # 配置檔範本
 ├── 啟動Telegram橋接器.bat           # Windows 一鍵啟動背景守護腳本
 ├── 使用指南_3分鐘極速啟用.md       # 詳細啟用指南
 ├── 手機上傳臨時存放區/             # 手機上傳照片/檔案之暫存目錄
+├── 📱_手機Telegram即時收件匣.md     # 電腦螢幕即時收件匣 (本機獨立)
+├── 📱_手機Telegram歷史紀錄.log     # 手機端完整提問歷史 Log
 ├── Antigravity_VSCode擴充與手機遠端操控架構指南.md
 └── README.md
 ```
@@ -41,16 +47,15 @@ antigravity_mobile_bridge/
 1. 在 Telegram 搜尋 **`@BotFather`**。
 2. 輸入 `/newbot` 建立機器人，取得專屬 **`HTTP API Token`**。
 
-### 步驟 2：建立設定檔
-1. 將 `bridge_config.template.json` 複製並更名為 `bridge_config.json`。
-2. 填入你的 Bot Token：
+### 步驟 2：設定設定檔
+1. 在 `bridge_config.json` 填入你的 Bot Token：
 ```json
 {
     "bot_token": "YOUR_TELEGRAM_BOT_TOKEN_HERE",
     "allowed_user_id": 0,
-    "workspace_root": "C:\\Your\\Workspace\\Path",
-    "current_project": "任務",
-    "auto_sync_agent_replies": true,
+    "workspace_root": "c:\\Users\\yexia\\Documents\\ShihWei\\NTNU\\GitHub",
+    "current_project": "Telegram_Agent_Bridge",
+    "auto_sync_agent_replies": false,
     "poll_interval_seconds": 1.0
 }
 ```
@@ -68,13 +73,15 @@ python antigravity_telegram_bridge.py
 
 | 指令 | 說明 |
 | :--- | :--- |
-| `/start` 或 `/pin` | 重新發送並置頂隨身操作卡片 |
-| `/projects` | 彈出互動資料夾按鈕，切換當前工作專案 |
-| `/ls` | 列出當前專案目錄底下的檔案與資料夾 |
-| `/staging` | 查看【手機上傳臨時存放區】中的暫存檔案 |
-| `/status` | 檢視連線狀態、工作目錄與 Agent 健康度 |
-| `/apk` | 傳送最新編譯之 APK 安裝包至手機 |
-| `/clear` | 重置手機即時收件匣 |
+| `/tree` | 🧭 瀏覽 IDE 資料夾樹地圖 / 檔案總管 (點擊按鈕層層深入與切換) |
+| `/cd` | 🎯 切換工作專案或目錄 (`/cd <關鍵字>` 或 `/cd ..`) |
+| `/ls` | 📂 查看當前專案目錄底下的檔案與資料夾清單 |
+| `/pwd` | 📍 檢視當前工作位置與圖片上傳目標路徑 |
+| `/staging` | 📦 查看【手機上傳臨時存放區】中的暫存檔案 |
+| `/status` | 📊 檢視手機專屬 Agent 狀態與連線健康度 |
+| `/clear` | 🧹 重置手機即時收件匣與對話記憶 |
+| `/apk` | 📦 傳送最新編譯之 APK 安裝包至手機 |
+| `/pin` | 📌 重新發送並置頂專屬隨身操作面板卡片 |
 
 ---
 

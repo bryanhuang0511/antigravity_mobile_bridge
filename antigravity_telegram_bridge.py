@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🤖 Antigravity Telegram Remote Agent Bridge (全自動檔案管家 & 引用回覆精準分流旗艦版)
+📱 Antigravity Telegram Mobile Dedicated Agent (手機專屬獨立 Agent 旗艦版)
 ========================================================================================
-✨ 核心亮點：
-1. 🎯 引用回覆精準定向 (Reply-To Precision Routing)：
-   - 手機收到不同 Agent 通知時，只要「長按該訊息點選回覆 (Reply)」，系統自動對接該專屬 Agent，絕不打架混淆！
-2. 🔕 批次相片合流防刷屏 (Debounce Batch Aggregation)：
+✨ 核心架構特色：
+1. 📱 手機專屬獨立 Agent (Dedicated Mobile Agent)：
+   - 手機 Telegram 獨立為專屬 Agent 視窗，手機發問直接由專屬 Agent 回覆，不干擾也不受限於電腦端其他視窗！
+   - 具備連續多輪對話記憶（Multi-Turn Memory），陪伴感滿滿！
+2. 📦 完整本地路徑隔離 (Clean Local Storage Isolation)：
+   - 即時收件匣、歷史紀錄 Log、手機上傳臨時存放區，100% 獨立存放於 Telegram_Agent_Bridge/，不污染任務目錄！
+3. 🧭 互動式視覺化樹狀地圖 (/tree)：
+   - 動態生成直觀清晰的 ASCII 資料夾樹狀圖，搭配 Telegram Inline Keyboard 一鍵層層深入、返回上一層與鎖定專案！
+4. 🔕 批次相片合流防刷屏 (Debounce Batch Aggregation)：
    - 連續傳送多張照片時，自動合流為 1 則乾淨匯總通知，告別密集跳通知轟炸！
-3. 🎯 目標目錄持久記憶 (Persistent Target Location)：
-   - 說「放到 illit / 桌面 / 04」，目標目錄自動寫入設定檔持久保存，重開機不丟失！
-4. 📦 專屬【手機上傳臨時存放區】：若未指定目標，預設安全收納於暫存區，隨時一鍵整批搬移！
-5. 🚚 全自動搬移 (Autonomous File Mover)：說「移到 illit/桌面/04」，Agent 直接自動整批搬移並清空暫存！
-6. 📁 互動式專案選擇器：Telegram 按鈕一鍵切換【鈣鈦礦/任務/手機維修/BalatroMaker/圖片illit】！
-7. 🔕 原地訊息編輯 (In-place Edit)：Working 提示直接變形為最終結果，0 重複回覆！
-8. 🧠 AI 記憶自動精華統整：自動將手機操作摘要記錄進 pending_sync.md，不污染原始記憶！
+5. 🎯 目標目錄持久記憶 & 全自動搬移 (Autonomous File Mover)：
+   - 說「放到 illit / 桌面 / 04」，目標目錄自動寫入設定檔持久保存；說「移到 illit」，一鍵整批搬移並清空暫存！
+6. 🧠 AI 記憶自動精華統整：
+   - 自動將手機重要操作摘要記錄進 pending_sync.md，不污染原始記憶庫！
 """
 
 import os
@@ -45,7 +47,30 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[logging.StreamHandler(sys.stdout)]
 )
-logger = logging.getLogger("AntigravityBridge")
+logger = logging.getLogger("AntigravityMobileBridge")
+
+# ==============================================================================
+# ⚙️ 配置檔案路徑與目錄定義 (100% 本地隔離)
+# ==============================================================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(BASE_DIR, "bridge_config.json")
+WORKSPACE_DEFAULT = r"c:\Users\yexia\Documents\ShihWei\NTNU\GitHub"
+PID_FILE = os.path.join(BASE_DIR, ".bridge.pid")
+
+# 🌟 本地收件匣與日誌 (完全獨立於 Telegram_Agent_Bridge 目錄內)
+INBOX_FILE = os.path.join(BASE_DIR, "📱_手機Telegram即時收件匣.md")
+HISTORY_LOG_FILE = os.path.join(BASE_DIR, "📱_手機Telegram歷史紀錄.log")
+PENDING_SYNC_FILE = os.path.expanduser(r"~\.gemini\memory_vault\pending_sync.md")
+
+# 🌟 常用目錄路徑
+STAGING_DIR = os.path.join(BASE_DIR, "手機上傳臨時存放區")
+DESKTOP_DIR = os.path.expanduser(r"~\Desktop")
+PICTURES_DIR = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Pictures")
+ILLIT_DIR = os.path.join(PICTURES_DIR, "illit")
+NVIDIA_KEY_FILE = os.path.join(WORKSPACE_DEFAULT, "nvidia_build.txt")
+
+os.makedirs(STAGING_DIR, exist_ok=True)
+os.makedirs(ILLIT_DIR, exist_ok=True)
 
 # ==============================================================================
 # 🔒 單例進程鎖定器
@@ -58,34 +83,20 @@ def ensure_single_instance(port: int = 47890) -> bool:
         s.bind(('127.0.0.1', port))
         s.listen(1)
         SINGLETON_SOCKET = s
-        logger.info("🔒 成功取得單例進程鎖定 (Port: %d)，保證唯一實例運行！", port)
+        try:
+            with open(PID_FILE, "w", encoding="utf-8") as f:
+                f.write(str(os.getpid()))
+        except Exception:
+            pass
+        logger.info("🔒 成功取得單例進程鎖定 (Port: %d, PID: %d)！", port, os.getpid())
         return True
     except socket.error:
         logger.error("❌ 已經有另一個 Bridge 進程正在運行！請關閉舊進程後再重試。")
         sys.exit(0)
 
 # ==============================================================================
-# ⚙️ 配置檔案路徑與預設參數
+# 🔑 NVIDIA API Key 與設定檔管理
 # ==============================================================================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_FILE = os.path.join(BASE_DIR, "bridge_config.json")
-WORKSPACE_DEFAULT = r"c:\Users\yexia\Documents\ShihWei\NTNU\GitHub"
-BRAIN_DIR = os.path.expanduser(r"~\.gemini\antigravity-ide\brain")
-INBOX_FILE = os.path.join(WORKSPACE_DEFAULT, "任務", "📱_手機Telegram即時收件匣.md")
-HISTORY_LOG_FILE = os.path.join(WORKSPACE_DEFAULT, "任務", "📱_手機Telegram歷史紀錄.log")
-PENDING_SYNC_FILE = os.path.expanduser(r"~\.gemini\memory_vault\pending_sync.md")
-
-# 🌟 常用目錄路徑
-STAGING_DIR = os.path.join(BASE_DIR, "手機上傳臨時存放區")
-DESKTOP_DIR = os.path.expanduser(r"~\Desktop")
-PICTURES_DIR = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Pictures")
-ILLIT_DIR = os.path.join(PICTURES_DIR, "illit")
-
-os.makedirs(STAGING_DIR, exist_ok=True)
-os.makedirs(ILLIT_DIR, exist_ok=True)
-
-NVIDIA_KEY_FILE = os.path.join(WORKSPACE_DEFAULT, "nvidia_build.txt")
-
 def get_nvidia_api_key() -> str:
     """自動讀取 NVIDIA API Key (支援環境變數、配置檔與本地密鑰檔)"""
     env_key = os.environ.get("NVIDIA_API_KEY", "").strip()
@@ -107,10 +118,10 @@ def load_config() -> Dict[str, Any]:
         "bot_token": "YOUR_TELEGRAM_BOT_TOKEN_HERE",
         "allowed_user_id": 0,
         "workspace_root": WORKSPACE_DEFAULT,
-        "current_project": "任務",
+        "current_project": "Telegram_Agent_Bridge",
         "target_upload_dir": ILLIT_DIR,
         "target_upload_name": "🖼️ 圖片/illit",
-        "auto_sync_agent_replies": True,
+        "auto_sync_agent_replies": False,
         "poll_interval_seconds": 1.0,
         "ai_model": "meta/llama-3.1-8b-instruct"
     }
@@ -148,10 +159,10 @@ class TelegramClient:
                 req = urllib.request.Request(
                     url,
                     data=json_data,
-                    headers={"Content-Type": "application/json", "User-Agent": "AntigravityBridge/6.0"}
+                    headers={"Content-Type": "application/json", "User-Agent": "AntigravityMobileBridge/7.0"}
                 )
             else:
-                req = urllib.request.Request(url, headers={"User-Agent": "AntigravityBridge/6.0"})
+                req = urllib.request.Request(url, headers={"User-Agent": "AntigravityMobileBridge/7.0"})
 
             with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=timeout) as response:
                 res_body = response.read().decode("utf-8")
@@ -179,19 +190,21 @@ class TelegramClient:
         return res if res is not None else []
 
     def set_bot_commands(self) -> bool:
+        """設定手機端專屬簡潔指令清單 (移除 sessions 等干擾項目)"""
         commands = [
             {"command": "tree", "description": "🧭 IDE 檔案總管 / 資料夾樹地圖 (點擊切換)"},
             {"command": "cd", "description": "🎯 切換工作專案或目錄 (/cd <關鍵字>)"},
-            {"command": "pwd", "description": "📍 檢視當前所在專案與完整目錄"},
-            {"command": "ls", "description": "📂 列出當前專案目錄下的所有檔案"},
+            {"command": "ls", "description": "📂 查看當前專案目錄檔案清單"},
+            {"command": "pwd", "description": "📍 檢視當前工作位置與上傳目標"},
             {"command": "staging", "description": "📦 查看【手機上傳臨時存放區】檔案"},
-            {"command": "sessions", "description": "🎛️ 檢視電腦所有在線 Agent 視窗"},
-            {"command": "status", "description": "📊 檢視連線狀態與健康度"},
+            {"command": "status", "description": "📊 檢視手機專屬 Agent 狀態與健康度"},
+            {"command": "clear", "description": "🧹 重置手機即時收件匣"},
             {"command": "apk", "description": "📦 傳送最新 Samsung A32 氣氛燈 APK"},
-            {"command": "pin", "description": "📌 置頂隨身操作卡片"},
-            {"command": "clear", "description": "🧹 重置手機收件匣"}
+            {"command": "pin", "description": "📌 置頂手機專屬操作面板卡片"}
         ]
         res = self._request("setMyCommands", {"commands": commands})
+        if res:
+            logger.info("✨ 成功向 Telegram 註冊最新手機專屬指令選單！")
         return res is not None
 
     def answer_callback_query(self, callback_query_id: str, text: str = ""):
@@ -261,7 +274,7 @@ class TelegramClient:
             file_path = res["file_path"]
             download_url = f"https://api.telegram.org/file/bot{self.token}/{file_path}"
             
-            req = urllib.request.Request(download_url, headers={"User-Agent": "AntigravityBridge/6.0"})
+            req = urllib.request.Request(download_url, headers={"User-Agent": "AntigravityMobileBridge/7.0"})
             os.makedirs(os.path.dirname(os.path.abspath(dest_path)), exist_ok=True)
             
             with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=60) as resp:
@@ -294,7 +307,7 @@ class TelegramClient:
             req = urllib.request.Request(
                 url,
                 data=body,
-                headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "AntigravityBridge/6.0"}
+                headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "AntigravityMobileBridge/7.0"}
             )
             with urllib.request.urlopen(req, context=self.ssl_ctx, timeout=120) as response:
                 res = json.loads(response.read().decode("utf-8"))
@@ -304,25 +317,27 @@ class TelegramClient:
             return False
 
 # ==============================================================================
-# 🤖 AI 智慧思考大腦
+# 🤖 手機專屬獨立 AI 思考大腦 (Mobile Dedicated Agent Brain)
 # ==============================================================================
-class AIBrainEngine:
+class MobileAIEngine:
     @staticmethod
     def get_system_prompt(current_project: str, current_cwd: str, target_upload_name: str, target_upload_dir: str) -> str:
-        return f"""你是 Antigravity Telegram 遠端全能 Agent 核心。
-稱呼使用者為「夥伴」。
-回答風格：50% 情緒價值 + 50% 實質解答，請大量使用活力表情符號 🌟 🚀 💡。
+        return f"""你是夥伴專屬的【📱 Antigravity 手機獨立 Agent】！
+你是一個常駐於手機 Telegram 上的隨身超級工程助手與管家。
+每次對話稱呼夥伴為「夥伴」。
 
-【當前目標專案與環境】：
-- 當前目標專案：{current_project}
-- 本地工作目錄：{current_cwd}
-- 當前圖片存放目錄：{target_upload_name} ({target_upload_dir})
+【回答風格與原則】：
+1. 🌟 50% 情緒價值 + 50% 實質解答，多使用活力表情符號 🌟 🚀 💡 ✨ 🎉。
+2. 繁體中文回答，條理分明、簡潔精準，適合手機螢幕快速閱讀。
+3. 嚴格領域隔離：非物理話題禁止使用物理公式或比喻；專注回答夥伴當前交辦的軟體、檔案或工程任務。
+4. 軟體安全守則：絕不在未經夥伴明確授權下刪除重要系統檔案或軟體。
+
+【當前手機 Agent 操控環境】：
+- 當前工作專案：{current_project}
+- 本地實體目錄：{current_cwd}
+- 預設存圖目標：{target_upload_name} ({target_upload_dir})
 - 手機臨時存放區：{STAGING_DIR}
-
-【能力要求】：
-1. 繁體中文回答，清楚、專業、結構化。
-2. 語氣熱情、積極、值得信賴。
-3. 嚴格領域純粹，專注當前專案解答。"""
+"""
 
     @staticmethod
     def query_ai(user_prompt: str, current_project: str, current_cwd: str, target_upload_name: str, target_upload_dir: str, history: Optional[List[Dict[str, str]]] = None, model: str = "meta/llama-3.1-8b-instruct") -> str:
@@ -334,14 +349,14 @@ class AIBrainEngine:
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
-            "User-Agent": "AntigravityBridge/6.0"
+            "User-Agent": "AntigravityMobileBridge/7.0"
         }
 
-        system_content = AIBrainEngine.get_system_prompt(current_project, current_cwd, target_upload_name, target_upload_dir)
+        system_content = MobileAIEngine.get_system_prompt(current_project, current_cwd, target_upload_name, target_upload_dir)
         messages = [{"role": "system", "content": system_content}]
         if history:
-            for item in history[-4:]:
-                messages.append({"role": item.get("role", "user"), "content": item.get("text", "")})
+            for item in history[-6:]:
+                messages.append({"role": item.get("role", "user"), "content": item.get("content", "")})
         messages.append({"role": "user", "content": user_prompt})
 
         data = {
@@ -364,156 +379,41 @@ class AIBrainEngine:
             logger.error(f"AI 大腦調用異常: {e}")
             if model != "meta/llama-3.2-11b-vision-instruct":
                 logger.info("🔄 正在嘗試 Fallback 模型 (meta/llama-3.2-11b-vision-instruct)...")
-                return AIBrainEngine.query_ai(user_prompt, current_project, current_cwd, target_upload_name, target_upload_dir, history, model="meta/llama-3.2-11b-vision-instruct")
+                return MobileAIEngine.query_ai(user_prompt, current_project, current_cwd, target_upload_name, target_upload_dir, history, model="meta/llama-3.2-11b-vision-instruct")
             return f"❌ AI 運算暫時繁忙或連線逾時：`{e}`"
 
 # ==============================================================================
-# 🧠 Antigravity 全域多 Agent 對話管理與記憶統整器
+# 📝 本地日誌、收件匣與記憶統整器
 # ==============================================================================
-class TranscriptSyncEngine:
+class MobileStorageManager:
     @staticmethod
-    def get_all_sessions() -> List[Dict[str, Any]]:
-        sessions = []
-        if not os.path.exists(BRAIN_DIR):
-            return sessions
-
-        for entry in os.listdir(BRAIN_DIR):
-            conv_dir = os.path.join(BRAIN_DIR, entry)
-            if not os.path.isdir(conv_dir) or entry == "tempmediaStorage":
-                continue
-
-            transcript_path = os.path.join(conv_dir, ".system_generated", "logs", "transcript.jsonl")
-            if not os.path.exists(transcript_path):
-                continue
-
-            mtime = os.path.getmtime(transcript_path)
-            workspace = "任務"
-            last_user_msg = ""
-            
-            try:
-                with open(transcript_path, "r", encoding="utf-8", errors="replace") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            data = json.loads(line)
-                            content = urllib.parse.unquote(str(data.get("content", "")))
-                            
-                            if "NTNU\\GitHub\\" in content or "NTNU/GitHub/" in content:
-                                normalized = content.replace("/", "\\")
-                                for chunk in normalized.split("NTNU\\GitHub\\")[1:]:
-                                    ws = chunk.split("\\")[0].split("\"")[0].split("'")[0].split("`")[0].split("\n")[0].strip()
-                                    if ws and ws not in [".", "..", ""]:
-                                        workspace = ws
-                                        break
-                            
-                            if data.get("source") == "USER_EXPLICIT" and data.get("type") == "USER_INPUT":
-                                req = content
-                                if "<USER_REQUEST>" in req:
-                                    req = req.split("<USER_REQUEST>")[1].split("</USER_REQUEST>")[0].strip()
-                                if req:
-                                    last_user_msg = req[:60].replace("\n", " ")
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-
-            friendly_name = f"📁 {workspace} Agent"
-            short_key = workspace
-            if "Perovskite" in workspace or "鈣鈦礦" in workspace or "擷取工具" in workspace:
-                friendly_name = "🧪 鈣鈦礦 Agent (Perovskite)"
-                short_key = "Perovskite"
-            elif "任務" in workspace:
-                friendly_name = "⚡ 任務 Agent (Tasks & Tools)"
-                short_key = "任務"
-            elif "視覺動態" in workspace or "手機待修" in workspace:
-                friendly_name = "📱 手機維修與視覺 Agent"
-                short_key = "視覺動態效果手機待修"
-            elif "BalatroMaker" in workspace:
-                friendly_name = "🎮 BalatroMaker Agent"
-                short_key = "BalatroMaker"
-
-            sessions.append({
-                "id": entry,
-                "name": friendly_name,
-                "short_key": short_key,
-                "workspace": workspace,
-                "path": transcript_path,
-                "last_msg": last_user_msg if last_user_msg else "(新對話視窗)",
-                "mtime": mtime,
-                "mtime_str": time.strftime("%m/%d %H:%M:%S", time.localtime(mtime))
-            })
-
-        sessions.sort(key=lambda s: s["mtime"], reverse=True)
-        return sessions
-
-    @staticmethod
-    def get_transcript_path(conversation_id: str) -> Optional[str]:
-        path = os.path.join(BRAIN_DIR, conversation_id, ".system_generated", "logs", "transcript.jsonl")
-        return path if os.path.exists(path) else None
-
-    @staticmethod
-    def read_conversation_history(conversation_id: str, limit: int = 3) -> List[Dict[str, str]]:
-        path = TranscriptSyncEngine.get_transcript_path(conversation_id)
-        if not path or not os.path.exists(path):
-            return []
-
-        messages = []
-        try:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        data = json.loads(line)
-                        src = data.get("source")
-                        msg_type = data.get("type")
-                        content = data.get("content", "")
-
-                        if src == "USER_EXPLICIT" and msg_type == "USER_INPUT":
-                            clean_text = content
-                            if "<USER_REQUEST>" in clean_text:
-                                clean_text = clean_text.split("<USER_REQUEST>")[1].split("</USER_REQUEST>")[0].strip()
-                            if clean_text:
-                                messages.append({"role": "user", "text": clean_text})
-
-                        elif src == "MODEL" and msg_type == "PLANNER_RESPONSE" and content:
-                            messages.append({"role": "assistant", "text": content.strip()})
-                    except Exception:
-                        continue
-        except Exception as e:
-            logger.error(f"讀取對話歷史失敗: {e}")
-
-        return messages[-limit:]
-
-    @staticmethod
-    def record_mobile_inbox(user_id: int, message_text: str, target_agent: str, status: str = "🟡 處理中...", answer: str = ""):
+    def record_inbox(user_id: int, message_text: str, status: str = "🟢 處理完成", answer: str = ""):
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        if status.startswith("🟡"):
-            log_entry = f"[{timestamp}] [User: {user_id}] [Target: {target_agent}]\n{message_text}\n{'-'*50}\n"
-            try:
-                with open(HISTORY_LOG_FILE, "a", encoding="utf-8") as f:
-                    f.write(log_entry)
-            except Exception as e:
-                logger.error(f"寫入歷史 Log 失敗: {e}")
+        
+        # 寫入歷史 Log 檔 (持久留存於 Telegram_Agent_Bridge 目錄內)
+        log_entry = f"[{timestamp}] [User: {user_id}]\n提問: {message_text}\n回覆: {answer[:200]}...\n{'-'*50}\n"
+        try:
+            with open(HISTORY_LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(log_entry)
+        except Exception as e:
+            logger.error(f"寫入歷史 Log 失敗: {e}")
 
+        # 寫入電腦螢幕即時收件匣
         answer_block = ""
         if answer:
-            answer_block = f"### ✨ Agent 執行結果：\n```text\n{answer[:600]}...\n```\n\n"
+            answer_block = f"### ✨ 專屬 Mobile Agent 回覆：\n```text\n{answer[:600]}...\n```\n\n"
 
         inbox_content = (
             "# 📱 手機 Telegram ⇄ 電腦螢幕即時收件匣\n\n"
             f"> 🕒 **時間**：`{timestamp}` | 狀態：`{status}`\n"
-            f"> 🎯 **對象**：`{target_agent}`\n\n"
-            "### 💬 夥伴最新提問與指令：\n"
+            f"> 🎯 **模式**：`📱 手機專屬獨立 Agent`\n\n"
+            "### 💬 夥伴手機最新指令與提問：\n"
             "```text\n"
             f"{message_text}\n"
             "```\n\n"
             f"{answer_block}"
             "---\n"
-            "💡 *提示：手機與電腦隨時保持雙向同步，歷史紀錄已完整留存於 Log 檔。*\n"
+            "💡 *提示：本檔案位於 Telegram_Agent_Bridge/，隨時呈現手機端最新動態。*\n"
         )
         try:
             with open(INBOX_FILE, "w", encoding="utf-8") as f:
@@ -524,7 +424,7 @@ class TranscriptSyncEngine:
     @staticmethod
     def sync_to_ai_memory(summary_text: str, project_name: str):
         timestamp = time.strftime("%Y-%m-%d %H:%M")
-        entry = f"- **[{timestamp} 手機遠端 ({project_name})]**：{summary_text}\n"
+        entry = f"- **[{timestamp} 手機專屬 Agent ({project_name})]**：{summary_text}\n"
         try:
             os.makedirs(os.path.dirname(PENDING_SYNC_FILE), exist_ok=True)
             if not os.path.exists(PENDING_SYNC_FILE):
@@ -532,7 +432,7 @@ class TranscriptSyncEngine:
                     f.write("# 📥 待分類緩衝記憶區 (Pending Sync Buffer)\n\n---\n\n")
             with open(PENDING_SYNC_FILE, "a", encoding="utf-8") as f:
                 f.write(entry)
-            logger.info(f"🧠 已自動將操作摘要記入 pending_sync.md: {summary_text[:30]}...")
+            logger.info(f"🧠 已自動將手機操作摘要記入 pending_sync.md: {summary_text[:30]}...")
         except Exception as e:
             logger.debug(f"寫入 pending_sync.md 失敗: {e}")
 
@@ -564,7 +464,7 @@ class PhotoBatchBuffer:
             self.flush_callback(batch)
 
 # ==============================================================================
-# 🎮 Agent 核心橋接器與主守護進程
+# 🎮 手機專屬獨立 Agent 橋接核心 (Antigravity Mobile Bridge Daemon)
 # ==============================================================================
 class AntigravityBridgeDaemon:
     def __init__(self):
@@ -575,52 +475,71 @@ class AntigravityBridgeDaemon:
         self.running = True
         
         self.workspace_root = self.config.get("workspace_root", WORKSPACE_DEFAULT)
-        self.current_project = self.config.get("current_project", "任務")
-        self.current_cwd = os.path.join(self.workspace_root, self.current_project)
+        self.current_project = self.config.get("current_project", "Telegram_Agent_Bridge")
+        self.current_cwd = os.path.join(self.workspace_root, self.current_project.replace("/", "\\"))
         if not os.path.exists(self.current_cwd):
-            self.current_cwd = self.workspace_root
+            self.current_cwd = os.path.join(self.workspace_root, "Telegram_Agent_Bridge")
+            if not os.path.exists(self.current_cwd):
+                self.current_cwd = self.workspace_root
             
         # 🌟 持久化目標存放目錄
         self.target_upload_dir = self.config.get("target_upload_dir", ILLIT_DIR)
         self.target_upload_name = self.config.get("target_upload_name", "🖼️ 圖片/illit")
         os.makedirs(self.target_upload_dir, exist_ok=True)
-            
-        self.target_conv_id = ""
-        self.target_agent_name = f"⚡ {self.current_project} Agent"
         
-        # 🌟 訊息 ID ➔ Agent 上下文映射表（用於長按引用回覆精準路由！）
-        self.message_context_map: Dict[int, Dict[str, Any]] = {}
+        # 🌟 手機專屬獨立對話歷史 (Multi-turn Memory)
+        self.mobile_chat_history: List[Dict[str, str]] = []
         
         # 🌟 批次相片防刷屏緩衝器
         self.photo_buffer = PhotoBatchBuffer(self.on_photo_batch_finished, delay_seconds=2.0)
-        
-        # 紀錄所有視窗的已讀行數指標
-        self.synced_lines_map: Dict[str, int] = {}
-        sessions = TranscriptSyncEngine.get_all_sessions()
-        for s in sessions:
-            self.synced_lines_map[s["id"]] = self._get_transcript_line_count(s["id"])
-        if sessions:
-            self.target_conv_id = sessions[0]["id"]
 
-    def _get_transcript_line_count(self, conv_id: str) -> int:
-        path = TranscriptSyncEngine.get_transcript_path(conv_id)
-        if not path or not os.path.exists(path):
-            return 0
-        try:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
-                return sum(1 for _ in f)
-        except Exception:
-            return 0
+    # --------------------------------------------------------------------------
+    # 🌲 視覺化樹狀圖生成與導航按鈕
+    # --------------------------------------------------------------------------
+    def generate_ascii_tree(self, root_dir: str, max_depth: int = 2) -> str:
+        """動態生成美觀清晰的 ASCII 資料夾與檔案樹狀結構"""
+        if not os.path.exists(root_dir):
+            return "(目錄不存在)"
 
-    def _find_conv_id_for_project(self, project_name: str) -> str:
-        sessions = TranscriptSyncEngine.get_all_sessions()
-        for s in sessions:
-            if s.get("short_key") == project_name or s.get("workspace") == project_name:
-                return s["id"]
-        return self.target_conv_id
+        ignored = {".git", "__pycache__", "node_modules", "venv", ".gemini", ".vscode", "tempmediaStorage", ".system_generated"}
+        lines = []
+
+        def _build_tree(current_path: str, prefix: str = "", depth: int = 1):
+            if depth > max_depth:
+                return
+            try:
+                entries = sorted(os.listdir(current_path))
+            except Exception:
+                return
+
+            dirs = [e for e in entries if os.path.isdir(os.path.join(current_path, e)) and e not in ignored and not e.startswith(".")]
+            files = [e for e in entries if os.path.isfile(os.path.join(current_path, e)) and not e.startswith(".")]
+
+            total_items = dirs[:5] + files[:4]
+            count = len(total_items)
+
+            for idx, item in enumerate(total_items):
+                is_last = (idx == count - 1)
+                branch = "└── " if is_last else "├── "
+                next_prefix = prefix + ("    " if is_last else "│   ")
+                
+                item_path = os.path.join(current_path, item)
+                if os.path.isdir(item_path):
+                    lines.append(f"{prefix}{branch}📁 **{item}/**")
+                    if depth < max_depth:
+                        _build_tree(item_path, next_prefix, depth + 1)
+                else:
+                    lines.append(f"{prefix}{branch}📄 `{item}`")
+
+            if len(dirs) > 5 or len(files) > 4:
+                lines.append(f"{prefix}└── ... *(其他項略)*")
+
+        lines.append(f"📁 **{os.path.basename(root_dir) if root_dir != self.workspace_root else 'GitHub 根目錄'}/**")
+        _build_tree(root_dir, "", 1)
+        return "\n".join(lines)
 
     def get_directory_browser_keyboard(self, target_path: Optional[str] = None) -> Tuple[str, Dict[str, Any]]:
-        """動態生成 IDE 風格檔案總管 / 資料夾樹地圖 (Inline Keyboard)"""
+        """動態生成 IDE 風格檔案總管 / 資料夾樹地圖 (包含 ASCII 樹狀預覽與互動按鈕)"""
         curr = target_path if target_path and os.path.exists(target_path) else self.current_cwd
         if not os.path.exists(curr):
             curr = self.workspace_root
@@ -670,14 +589,19 @@ class AntigravityBridgeDaemon:
             {"text": "🖼️ 設為圖片目標", "callback_data": f"set_target_dir:{curr_rel_code}"},
             {"text": "📦 查看暫存區", "callback_data": "action:staging"}
         ])
+
+        # 生成 ASCII 樹狀圖
+        ascii_tree = self.generate_ascii_tree(curr, max_depth=2)
         
         text = (
             "🧭 **【IDE 檔案總管 / 資料夾樹地圖】** 🌟\n"
             "━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📍 **當前瀏覽目錄**：`{rel_curr}`\n"
-            f"📁 **實體路徑**：`{curr}`\n"
-            f"📊 **子資料夾數量**：`{len(entries)} 個`\n\n"
-            "👇 **點擊下方資料夾即可層層深入，點擊「✅ 鎖定」即完成切換！**"
+            f"📍 **當前瀏覽**：`{rel_curr}`\n"
+            f"📁 **實體路徑**：`{curr}`\n\n"
+            f"🌲 **樹狀結構預覽**：\n"
+            f"{ascii_tree}\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n"
+            "👇 **點擊下方按鈕即可層層深入，點擊「✅ 鎖定」即切換至該專案！**"
         )
         return text, {"inline_keyboard": keyboard_buttons}
 
@@ -689,15 +613,11 @@ class AntigravityBridgeDaemon:
                     {"text": "📂 查看當前檔案 (/ls)", "callback_data": "action:ls"}
                 ],
                 [
-                    {"text": "⚡ 任務與工具", "callback_data": "set_proj:任務"},
-                    {"text": "🧪 鈣鈦礦 (Perovskite)", "callback_data": "set_proj:Perovskite"}
+                    {"text": "🤖 Telegram Bridge (本專案)", "callback_data": "set_proj:Telegram_Agent_Bridge"},
+                    {"text": "📱 視覺動態效果/mobile", "callback_data": "set_proj:視覺動態效果/mobile"}
                 ],
                 [
-                    {"text": "📱 視覺動態效果/mobile", "callback_data": "set_proj:視覺動態效果/mobile"},
-                    {"text": "📱 視覺動態效果(根)", "callback_data": "set_proj:視覺動態效果"}
-                ],
-                [
-                    {"text": "🤖 Telegram Bridge", "callback_data": "set_proj:Telegram_Agent_Bridge"},
+                    {"text": "🧪 鈣鈦礦 (Perovskite)", "callback_data": "set_proj:Perovskite"},
                     {"text": "🎮 BalatroMaker", "callback_data": "set_proj:BalatroMaker"}
                 ],
                 [
@@ -711,165 +631,29 @@ class AntigravityBridgeDaemon:
 
     def send_pin_guide(self, chat_id: int):
         guide_text = (
-            "📌 **【Antigravity 全自動檔案管家 & 雙向時序 Agent】** 🌟\n"
+            "📌 **【Antigravity 手機專屬獨立 Agent】** 🌟\n"
             "━━━━━━━━━━━━━━━━━━━━━\n"
-            f"🎯 **當前預設專案**：`{self.current_project}`\n"
-            f"📁 **目前工作目錄**：`{self.current_cwd}`\n"
-            f"🖼️ **圖片目標目錄**：`{self.target_upload_name}`\n"
+            f"🎯 **當前專案**：`{self.current_project}`\n"
+            f"📁 **工作目錄**：`{self.current_cwd}`\n"
+            f"🖼️ **圖片目標**：`{self.target_upload_name}`\n"
             f"📦 **臨時存放區**：`Telegram_Agent_Bridge/手機上傳臨時存放區`\n\n"
-            "💬 **操作技巧（絕不打架）**：\n"
-            "• 🎯 **引用回覆精準對接**：手機收到不同 Agent 通知時，**長按該訊息按「回覆 (Reply)」**，即可 100% 精準對接該 Agent！\n"
-            "• 🖼️ **傳圖直達**：直接傳送多張照片，自動存入【`圖片/illit`】，合流為 1 則匯總通知（不刷屏）！\n"
-            "• 🚚 **整批搬移**：說「`把暫存區移到桌面/illit`」，整批自動搬移並清空暫存！\n"
-            "📁 **切換專案**：輸入 `/projects` 彈出互動資料夾按鈕\n"
-            "📂 **查看檔案**：輸入 `/ls` 列出當前目錄所有檔案\n"
-            "⚡ **執行指令**：輸入 `/run <PowerShell指令>` 遠端操盤\n"
-            "📦 **傳送 APK**：輸入 `/apk` 秒傳最新氣氛燈安裝包！\n"
+            "💬 **操作技巧**：\n"
+            "• 📱 **專屬問答**：直接傳送任何問題或指令，專屬 Mobile Agent 即時解答！\n"
+            "• 🌲 **樹狀地圖**：輸入 `/tree` 瀏覽完整資料夾樹，點擊按鈕自由切換！\n"
+            "• 🖼️ **傳圖直達**：直接傳送多張照片，自動存入【`圖片/illit`】並合流通知！\n"
+            "• 🚚 **整批搬移**：說「`把暫存區移到桌面`」或「`移到 illit`」，一鍵整批搬移！\n"
+            "• 📂 **查看檔案**：輸入 `/ls` 列出當前專案所有檔案\n"
+            "• ⚡ **執行指令**：輸入 `/run <PowerShell指令>` 遠端操盤\n"
+            "• 📦 **傳送 APK**：輸入 `/apk` 秒傳最新安裝包！\n"
             "━━━━━━━━━━━━━━━━━━━━━"
         )
         msg_id = self.client.send_message(chat_id, guide_text, reply_markup=self.get_project_keyboard())
         if msg_id:
             self.client.pin_chat_message(chat_id, msg_id)
 
-    def start_live_sync_thread(self):
-        def sync_worker():
-            logger.info("🔄 電腦端視窗監聽與推播引擎已啟動！")
-            while self.running:
-                try:
-                    if self.allowed_user_id and self.config.get("auto_sync_agent_replies", True):
-                        sessions = TranscriptSyncEngine.get_all_sessions()
-                        for s in sessions[:5]:
-                            conv_id = s["id"]
-                            agent_name = s["name"]
-                            workspace = s["workspace"]
-                            path = s["path"]
-                            
-                            if path and os.path.exists(path):
-                                with open(path, "r", encoding="utf-8", errors="replace") as f:
-                                    lines = f.readlines()
-                            else:
-                                continue
-                            
-                            current_count = len(lines)
-                            last_synced = self.synced_lines_map.get(conv_id, current_count)
-                            
-                            if current_count > last_synced:
-                                for line in lines[last_synced:current_count]:
-                                    try:
-                                        data = json.loads(line.strip())
-                                        src = data.get("source")
-                                        msg_type = data.get("type")
-
-                                        if src == "MODEL" and msg_type == "PLANNER_RESPONSE":
-                                            content = data.get("content", "").strip()
-                                            if content and not (content.startswith("{") and content.endswith("}")):
-                                                logger.info(f"📡 偵測到電腦端 [{agent_name}] 回覆完畢，轉播至 Telegram...")
-                                                sync_msg = f"🖥️ **[{agent_name} 電腦端即時同步]** 🌟\n\n{content}"
-                                                sent_id = self.client.send_message(self.allowed_user_id, sync_msg)
-                                                
-                                                # 🌟 記錄訊息上下文，支援引用回覆精準定向！
-                                                if sent_id:
-                                                    self.message_context_map[sent_id] = {
-                                                        "project": workspace,
-                                                        "conv_id": conv_id,
-                                                        "agent_name": agent_name,
-                                                        "cwd": os.path.join(self.workspace_root, workspace.replace("/", "\\"))
-                                                    }
-                                    except Exception as err:
-                                        logger.debug(f"解析日誌行失敗: {err}")
-                                self.synced_lines_map[conv_id] = current_count
-                except Exception as e:
-                    logger.debug(f"同步線程輪詢異常: {e}")
-                time.sleep(1.5)
-
-        t = threading.Thread(target=sync_worker, daemon=True)
-        t.start()
-
-    def execute_command_sync(self, cmd: str, cwd: Optional[str] = None) -> str:
-        exec_cwd = cwd if cwd else self.current_cwd
-        try:
-            res = subprocess.run(
-                ["powershell", "-NoProfile", "-Command", cmd],
-                cwd=exec_cwd,
-                capture_output=True,
-                text=True,
-                timeout=180
-            )
-            out = res.stdout.strip()
-            err = res.stderr.strip()
-            if err:
-                return f"⚠️ **執行輸出 (含警告/錯誤)**:\n```\n{out}\n{err}\n```"
-            return f"✅ **執行成功**:\n```\n{out if out else '(無文字輸出)'}\n```"
-        except subprocess.TimeoutExpired:
-            return "⏱️ **執行超時**（超過 180 秒，已轉為背景執行）。"
-        except Exception as e:
-            return f"❌ **執行發生異常**: `{e}`"
-
-    def list_staging_files(self) -> str:
-        try:
-            if not os.path.exists(STAGING_DIR):
-                return "📦 **【手機上傳臨時存放區】目前為空。**"
-            files = [f for f in os.listdir(STAGING_DIR) if os.path.isfile(os.path.join(STAGING_DIR, f))]
-            if not files:
-                return "📦 **【手機上傳臨時存放區】目前為空。**\n*(上傳新照片或檔案將自動暫存於此 ✨)*"
-            
-            res = f"📦 **【手機上傳臨時存放區】(共 {len(files)} 個檔案)** 🌟\n"
-            res += f"📍 路徑：`{STAGING_DIR}`\n\n"
-            for f in files:
-                sz = os.path.getsize(os.path.join(STAGING_DIR, f)) // 1024
-                mtime = time.strftime("%m/%d %H:%M", time.localtime(os.path.getmtime(os.path.join(STAGING_DIR, f))))
-                res += f"  • 📄 `{f}` ({sz} KB, {mtime})\n"
-            res += "\n💡 *你可以直接對我說：「幫我把圖片移到桌面」或「移到 illit」，我會直接整批搬移並清空暫存！*"
-            return res
-        except Exception as e:
-            return f"❌ 讀取臨時存放區失敗：`{e}`"
-
-    def list_current_directory_files(self, cwd: Optional[str] = None, proj_name: Optional[str] = None) -> str:
-        target_cwd = cwd if cwd else self.current_cwd
-        target_proj = proj_name if proj_name else self.current_project
-        try:
-            if not os.path.exists(target_cwd):
-                return f"⚠️ 目錄不存在：`{target_cwd}`"
-            entries = os.listdir(target_cwd)
-            dirs = [d for d in entries if os.path.isdir(os.path.join(target_cwd, d))]
-            files = [f for f in entries if os.path.isfile(os.path.join(target_cwd, f))]
-            
-            res = f"📂 **【{target_proj} 目錄檔案清單】** 🌟\n"
-            res += f"📍 路徑：`{target_cwd}`\n\n"
-            if dirs:
-                res += "📁 **資料夾 (Directories)**:\n"
-                for d in dirs[:15]:
-                    res += f"  • 📁 `{d}/`\n"
-                if len(dirs) > 15:
-                    res += f"  ... 共 {len(dirs)} 個資料夾\n"
-                res += "\n"
-            if files:
-                res += "📄 **檔案 (Files)**:\n"
-                for f in files[:20]:
-                    sz = os.path.getsize(os.path.join(target_cwd, f)) // 1024
-                    res += f"  • 📄 `{f}` ({sz} KB)\n"
-                if len(files) > 20:
-                    res += f"  ... 共 {len(files)} 個檔案\n"
-            if not dirs and not files:
-                res += "*(此目錄目前為空)*\n"
-            return res
-        except Exception as e:
-            return f"❌ 讀取目錄失敗：`{e}`"
-
-    def read_file_content(self, filename: str, cwd: Optional[str] = None) -> str:
-        target_cwd = cwd if cwd else self.current_cwd
-        target = os.path.join(target_cwd, filename)
-        if not os.path.exists(target):
-            target = os.path.join(self.workspace_root, filename)
-        if not os.path.exists(target):
-            return f"❌ 找不到檔案：`{filename}`"
-        try:
-            with open(target, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read(3000)
-            return f"📄 **【檔案內容: {os.path.basename(target)}】**\n```\n{content}\n```"
-        except Exception as e:
-            return f"❌ 讀取檔案失敗：`{e}`"
-
+    # --------------------------------------------------------------------------
+    # 🔍 智慧目錄比對與切換
+    # --------------------------------------------------------------------------
     def get_all_workspace_directories(self) -> List[Tuple[str, str]]:
         """掃描 workspace_root 下的所有有效專案與子目錄 (絕對路徑, 相對路徑)"""
         results = []
@@ -893,7 +677,7 @@ class AntigravityBridgeDaemon:
         
         all_dirs = self.get_all_workspace_directories()
         
-        # 1. 完整相對路徑比對 (e.g. "視覺動態效果/mobile" 或 "mobile")
+        # 1. 完整相對路徑比對
         for abs_p, rel_p in all_dirs:
             if rel_p.lower() == q:
                 return abs_p, rel_p
@@ -925,7 +709,7 @@ class AntigravityBridgeDaemon:
         """自然語言與語音智慧辨識切換工作專案與目錄"""
         t = user_text.strip()
         nav_verbs = ["切到", "切換", "開", "移到", "進入", "去", "打開", "跳到", "到", "在", "層", "資料夾", "專案", "修補", "做", "前往", "cd "]
-        has_nav_intent = any(v in t for v in nav_verbs) or t.startswith("/") or "mobile" in t.lower() or "視覺" in t or "鈣鈦礦" in t
+        has_nav_intent = any(v in t for v in nav_verbs) or t.startswith("/") or "mobile" in t.lower() or "視覺" in t or "鈣鈦礦" in t or "bridge" in t.lower()
         
         cleaned = t
         for v in nav_verbs:
@@ -942,16 +726,15 @@ class AntigravityBridgeDaemon:
             self.config["current_project"] = rel_name
             self.config["current_cwd"] = matched_dir
             save_config(self.config)
-            logger.info(f"🎯 夥伴切換工作專案與目錄至：{rel_name} ({matched_dir})")
+            logger.info(f"🎯 夥伴切換工作專案至：{rel_name} ({matched_dir})")
             
             ls_preview = self.list_current_directory_files(cwd=matched_dir, proj_name=rel_name)
-            _, kb = self.get_directory_browser_keyboard(matched_dir)
             res = (
                 f"🎯 **【已成功切換至專案與目錄：{rel_name}】** 🌟\n"
                 f"📍 **實體路徑**：`{matched_dir}`\n"
                 "━━━━━━━━━━━━━━━━━━━━━\n\n"
                 f"{ls_preview}\n\n"
-                "💡 *提示：接下來發送的所有指令、提問與程式碼編寫，都將直接作用於此目錄！*"
+                "💡 *提示：接下來手機發送的所有指令、提問與程式碼編寫，都將直接作用於此目錄！*"
             )
             return res
         return None
@@ -969,7 +752,6 @@ class AntigravityBridgeDaemon:
         if "圖片" in text or "pictures" in t or "相片" in text:
             return PICTURES_DIR, "🖼️ 電腦圖片 (Pictures)"
             
-        # 智慧動態比對其他所有工作目錄
         matched_dir, rel_name = self.find_best_matching_directory(text)
         if matched_dir:
             return matched_dir, f"📁 {rel_name}"
@@ -1044,6 +826,97 @@ class AntigravityBridgeDaemon:
 
         return None
 
+    # --------------------------------------------------------------------------
+    # 📂 目錄與檔案操作
+    # --------------------------------------------------------------------------
+    def list_staging_files(self) -> str:
+        try:
+            if not os.path.exists(STAGING_DIR):
+                return "📦 **【手機上傳臨時存放區】目前為空。**"
+            files = [f for f in os.listdir(STAGING_DIR) if os.path.isfile(os.path.join(STAGING_DIR, f))]
+            if not files:
+                return "📦 **【手機上傳臨時存放區】目前為空。**\n*(上傳新照片或檔案將自動暫存於此 ✨)*"
+            
+            res = f"📦 **【手機上傳臨時存放區】(共 {len(files)} 個檔案)** 🌟\n"
+            res += f"📍 路徑：`{STAGING_DIR}`\n\n"
+            for f in files:
+                sz = os.path.getsize(os.path.join(STAGING_DIR, f)) // 1024
+                mtime = time.strftime("%m/%d %H:%M", time.localtime(os.path.getmtime(os.path.join(STAGING_DIR, f))))
+                res += f"  • 📄 `{f}` ({sz} KB, {mtime})\n"
+            res += "\n💡 *你可以直接對我說：「幫我把圖片移到桌面」或「移到 illit」，我會直接整批搬移並清空暫存！*"
+            return res
+        except Exception as e:
+            return f"❌ 讀取臨時存放區失敗：`{e}`"
+
+    def list_current_directory_files(self, cwd: Optional[str] = None, proj_name: Optional[str] = None) -> str:
+        target_cwd = cwd if cwd else self.current_cwd
+        target_proj = proj_name if proj_name else self.current_project
+        try:
+            if not os.path.exists(target_cwd):
+                return f"⚠️ 目錄不存在：`{target_cwd}`"
+            entries = os.listdir(target_cwd)
+            dirs = [d for d in entries if os.path.isdir(os.path.join(target_cwd, d))]
+            files = [f for f in entries if os.path.isfile(os.path.join(target_cwd, f))]
+            
+            res = f"📂 **【{target_proj} 目錄檔案清單】** 🌟\n"
+            res += f"📍 路徑：`{target_cwd}`\n\n"
+            if dirs:
+                res += "📁 **資料夾 (Directories)**:\n"
+                for d in dirs[:15]:
+                    res += f"  • 📁 `{d}/`\n"
+                if len(dirs) > 15:
+                    res += f"  ... 共 {len(dirs)} 個資料夾\n"
+                res += "\n"
+            if files:
+                res += "📄 **檔案 (Files)**:\n"
+                for f in files[:20]:
+                    sz = os.path.getsize(os.path.join(target_cwd, f)) // 1024
+                    res += f"  • 📄 `{f}` ({sz} KB)\n"
+                if len(files) > 20:
+                    res += f"  ... 共 {len(files)} 個檔案\n"
+            if not dirs and not files:
+                res += "*(此目錄目前為空)*\n"
+            return res
+        except Exception as e:
+            return f"❌ 讀取目錄失敗：`{e}`"
+
+    def read_file_content(self, filename: str, cwd: Optional[str] = None) -> str:
+        target_cwd = cwd if cwd else self.current_cwd
+        target = os.path.join(target_cwd, filename)
+        if not os.path.exists(target):
+            target = os.path.join(self.workspace_root, filename)
+        if not os.path.exists(target):
+            return f"❌ 找不到檔案：`{filename}`"
+        try:
+            with open(target, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read(3000)
+            return f"📄 **【檔案內容: {os.path.basename(target)}】**\n```\n{content}\n```"
+        except Exception as e:
+            return f"❌ 讀取檔案失敗：`{e}`"
+
+    def execute_command_sync(self, cmd: str, cwd: Optional[str] = None) -> str:
+        exec_cwd = cwd if cwd else self.current_cwd
+        try:
+            res = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", cmd],
+                cwd=exec_cwd,
+                capture_output=True,
+                text=True,
+                timeout=180
+            )
+            out = res.stdout.strip()
+            err = res.stderr.strip()
+            if err:
+                return f"⚠️ **執行輸出 (含警告/錯誤)**:\n```\n{out}\n{err}\n```"
+            return f"✅ **執行成功**:\n```\n{out if out else '(無文字輸出)'}\n```"
+        except subprocess.TimeoutExpired:
+            return "⏱️ **執行超時**（超過 180 秒，已轉為背景執行）。"
+        except Exception as e:
+            return f"❌ **執行發生異常**: `{e}`"
+
+    # --------------------------------------------------------------------------
+    # 📷 相片與檔案處理
+    # --------------------------------------------------------------------------
     def on_photo_batch_finished(self, batch: List[Dict[str, Any]]):
         if not batch:
             return
@@ -1069,22 +942,15 @@ class AntigravityBridgeDaemon:
             
         summary += "\n💡 *提示：所有圖片已安全落地電腦，你可以隨時在電腦開啟或下指令操作！*"
         
-        sent_id = self.client.send_message(chat_id, summary)
-        if sent_id:
-            self.message_context_map[sent_id] = {
-                "project": self.current_project,
-                "conv_id": self.target_conv_id,
-                "agent_name": dest_name,
-                "cwd": target_dir
-            }
-        TranscriptSyncEngine.record_mobile_inbox(self.allowed_user_id, f"[批次上傳 {count} 張照片]", dest_name, status="🟢 已全部存入", answer=summary)
-        TranscriptSyncEngine.sync_to_ai_memory(f"批次存入 {count} 張照片至 {dest_name}", self.current_project)
+        self.client.send_message(chat_id, summary)
+        MobileStorageManager.record_inbox(self.allowed_user_id, f"[批次上傳 {count} 張照片]", status="🟢 已全部存入", answer=summary)
+        MobileStorageManager.sync_to_ai_memory(f"批次存入 {count} 張照片至 {dest_name}", self.current_project)
 
     def handle_photo_message(self, chat_id: int, user_id: int, photo_list: list, caption: str):
         try:
             file_id = photo_list[-1]["file_id"]
             timestamp = time.strftime("%Y%m%d_%H%M%S")
-            filename = f"agent_{timestamp}.jpg"
+            filename = f"mobile_{timestamp}.jpg"
             
             target_dir = self.target_upload_dir
             dest_name = self.target_upload_name
@@ -1119,7 +985,7 @@ class AntigravityBridgeDaemon:
     def handle_document_message(self, chat_id: int, user_id: int, doc_obj: dict, caption: str):
         try:
             file_id = doc_obj.get("file_id")
-            file_name = doc_obj.get("file_name", f"agent_doc_{time.strftime('%Y%m%d_%H%M%S')}")
+            file_name = doc_obj.get("file_name", f"mobile_doc_{time.strftime('%Y%m%d_%H%M%S')}")
             
             target_dir = self.target_upload_dir
             dest_name = self.target_upload_name
@@ -1138,21 +1004,17 @@ class AntigravityBridgeDaemon:
                     f"📂 **路徑**：`{dest_path}`\n"
                     f"💾 **檔案大小**：`{size_kb} KB`"
                 )
-                sent_id = self.client.send_message(chat_id, reply)
-                if sent_id:
-                    self.message_context_map[sent_id] = {
-                        "project": self.current_project,
-                        "conv_id": self.target_conv_id,
-                        "agent_name": dest_name,
-                        "cwd": target_dir
-                    }
-                TranscriptSyncEngine.record_mobile_inbox(user_id, f"[上傳檔案: {file_name}]", dest_name, status="🟢 已下載存檔", answer=f"儲存於 {dest_path}")
+                self.client.send_message(chat_id, reply)
+                MobileStorageManager.record_inbox(user_id, f"[上傳檔案: {file_name}]", status="🟢 已下載存檔", answer=f"儲存於 {dest_path}")
             else:
                 self.client.send_message(chat_id, "❌ 檔案下載失敗。")
         except Exception as e:
             logger.error(f"處理檔案異常: {e}")
             self.client.send_message(chat_id, f"❌ 處理檔案失敗：`{e}`")
 
+    # --------------------------------------------------------------------------
+    # 🎛️ Inline Keyboard 點擊回呼處理
+    # --------------------------------------------------------------------------
     def handle_callback_query(self, cb: Dict[str, Any]):
         cb_id = cb.get("id", "")
         data = cb.get("data", "")
@@ -1247,7 +1109,7 @@ class AntigravityBridgeDaemon:
             self.client.send_message(chat_id, confirm_text, reply_markup=self.get_project_keyboard())
 
         elif data == "action:tree":
-            self.client.answer_callback_query(cb_id, text="正在載入檔案總管...")
+            self.client.answer_callback_query(cb_id, text="正在載入檔案總管樹狀圖...")
             tree_text, kb = self.get_directory_browser_keyboard(self.current_cwd)
             self.client.edit_message_text(chat_id, msg_id, tree_text, reply_markup=kb)
 
@@ -1261,92 +1123,89 @@ class AntigravityBridgeDaemon:
             ls_text = self.list_current_directory_files()
             self.client.send_message(chat_id, ls_text, reply_markup=self.get_project_keyboard())
 
-    def process_ai_question_async(self, chat_id: int, user_id: int, text: str, target_project: str, target_cwd: str, target_conv_id: str, agent_name: str, working_msg_id: Optional[int], is_reply_routing: bool = False):
+    # --------------------------------------------------------------------------
+    # 🤖 專屬 Mobile Agent 問答與非同步執行
+    # --------------------------------------------------------------------------
+    def process_ai_question_async(self, chat_id: int, user_id: int, text: str, working_msg_id: Optional[int]):
         def _task():
             try:
                 # 🌟 1. 優先檢測是否為切換工作目錄 / 專案指令
                 switch_res = self.try_switch_working_directory(text)
                 if switch_res:
-                    edited = False
                     if working_msg_id:
-                        edited = self.client.edit_message_text(chat_id, working_msg_id, switch_res)
-                    if not edited:
+                        self.client.edit_message_text(chat_id, working_msg_id, switch_res)
+                    else:
                         self.client.send_message(chat_id, switch_res)
-                    TranscriptSyncEngine.record_mobile_inbox(user_id, text, self.current_project, status="🟢 已切換工作專案與目錄", answer=switch_res)
-                    TranscriptSyncEngine.sync_to_ai_memory(f"切換專案與目錄至：{self.current_project}", self.current_project)
+                    MobileStorageManager.record_inbox(user_id, text, status="🟢 已切換工作專案與目錄", answer=switch_res)
+                    MobileStorageManager.sync_to_ai_memory(f"切換專案與目錄至：{self.current_project}", self.current_project)
                     return
 
                 # 🌟 2. 檢測是否為更改存圖目標指令
                 target_res = self.try_set_target_directory(text)
                 if target_res:
-                    edited = False
                     if working_msg_id:
-                        edited = self.client.edit_message_text(chat_id, working_msg_id, target_res)
-                    if not edited:
+                        self.client.edit_message_text(chat_id, working_msg_id, target_res)
+                    else:
                         self.client.send_message(chat_id, target_res)
-                    TranscriptSyncEngine.record_mobile_inbox(user_id, text, target_project, status="🟢 已設定上傳目標", answer=target_res)
-                    TranscriptSyncEngine.sync_to_ai_memory(f"設定圖片目標目錄：{self.target_upload_name}", target_project)
+                    MobileStorageManager.record_inbox(user_id, text, status="🟢 已設定上傳目標", answer=target_res)
+                    MobileStorageManager.sync_to_ai_memory(f"設定圖片目標目錄：{self.target_upload_name}", self.current_project)
                     return
 
                 # 🌟 3. 檢測是否為後續整批檔案搬移指令
                 action_result = self.try_autonomous_file_action(text)
                 if action_result:
-                    edited = False
                     if working_msg_id:
-                        edited = self.client.edit_message_text(chat_id, working_msg_id, action_result)
-                    if not edited:
+                        self.client.edit_message_text(chat_id, working_msg_id, action_result)
+                    else:
                         self.client.send_message(chat_id, action_result)
-                    TranscriptSyncEngine.record_mobile_inbox(user_id, text, target_project, status="🟢 已自動執行搬移完畢", answer=action_result)
-                    TranscriptSyncEngine.sync_to_ai_memory(f"自動執行檔案搬移：{text[:40]}", target_project)
+                    MobileStorageManager.record_inbox(user_id, text, status="🟢 已自動執行搬移完畢", answer=action_result)
+                    MobileStorageManager.sync_to_ai_memory(f"自動執行檔案搬移：{text[:40]}", self.current_project)
                     return
 
-                # 4. 一般問題：調用高效 AI 思考大腦 (精準定向專案 + 包含當前目錄標頭)
-                conv_id = target_conv_id if target_conv_id else self._find_conv_id_for_project(target_project)
-                history = TranscriptSyncEngine.read_conversation_history(conv_id, limit=3)
-                logger.info(f"🤖 正在為夥伴深度解答 ({agent_name}): {text[:40]}...")
+                # 🌟 4. 手機專屬獨立 Agent 深度解答 (Multi-turn Memory)
+                logger.info(f"🤖 專屬 Mobile Agent 正在為夥伴深度解答: {text[:40]}...")
                 self.client.send_chat_action(chat_id, "typing")
                 
-                answer = AIBrainEngine.query_ai(text, target_project, target_cwd, self.target_upload_name, self.target_upload_dir, history=history)
+                answer = MobileAIEngine.query_ai(
+                    text,
+                    self.current_project,
+                    self.current_cwd,
+                    self.target_upload_name,
+                    self.target_upload_dir,
+                    history=self.mobile_chat_history
+                )
                 
-                routing_tag = "🎯 引用對接" if is_reply_routing else "✨ 專屬解答"
+                # 記錄到手機專屬多輪對話歷史
+                self.mobile_chat_history.append({"role": "user", "content": text})
+                self.mobile_chat_history.append({"role": "assistant", "content": answer})
+                if len(self.mobile_chat_history) > 12:
+                    self.mobile_chat_history = self.mobile_chat_history[-12:]
+
                 header = (
-                    f"📍 **【當前專案與目錄】**：`{target_project}`\n"
-                    f"📂 `{target_cwd}`\n"
+                    f"📍 **【當前專案與目錄】**：`{self.current_project}`\n"
+                    f"📂 `{self.current_cwd}`\n"
                     "━━━━━━━━━━━━━━━━━━━━━\n\n"
                 )
-                reply_text = f"**【{agent_name} {routing_tag}】** 🌟\n\n{header}{answer}"
+                reply_text = f"**【📱 Mobile Agent 專屬解答】** 🌟\n\n{header}{answer}"
                 
-                edited = False
                 if working_msg_id:
-                    edited = self.client.edit_message_text(chat_id, working_msg_id, reply_text)
-                if not edited:
-                    sent_id = self.client.send_message(chat_id, reply_text)
-                    if sent_id:
-                        self.message_context_map[sent_id] = {
-                            "project": target_project,
-                            "conv_id": conv_id,
-                            "agent_name": agent_name,
-                            "cwd": target_cwd
-                        }
+                    self.client.edit_message_text(chat_id, working_msg_id, reply_text)
                 else:
-                    if working_msg_id:
-                        self.message_context_map[working_msg_id] = {
-                            "project": target_project,
-                            "conv_id": conv_id,
-                            "agent_name": agent_name,
-                            "cwd": target_cwd
-                        }
+                    self.client.send_message(chat_id, reply_text)
                 
-                TranscriptSyncEngine.record_mobile_inbox(user_id, text, agent_name, status="🟢 已解答完畢", answer=answer)
+                MobileStorageManager.record_inbox(user_id, text, status="🟢 已解答完畢", answer=answer)
                 summary_brief = text[:50].replace("\n", " ")
-                TranscriptSyncEngine.sync_to_ai_memory(f"問答與指令 ({agent_name})：{summary_brief}", target_project)
-                logger.info(f"🎉 已成功將 [{agent_name}] 解答推播給夥伴並完成收件匣與記憶統整！")
+                MobileStorageManager.sync_to_ai_memory(f"手機提問與指令：{summary_brief}", self.current_project)
+                logger.info(f"🎉 專屬 Mobile Agent 已成功將解答回傳給夥伴！")
             except Exception as e:
                 logger.error(f"非同步處理異常: {e}")
                 self.client.send_message(chat_id, f"❌ 處理過程發生異常：`{e}`")
 
         threading.Thread(target=_task, daemon=True).start()
 
+    # --------------------------------------------------------------------------
+    # 📩 訊息分發與指令解析器
+    # --------------------------------------------------------------------------
     def handle_message(self, msg: Dict[str, Any]):
         try:
             user = msg.get("from", {})
@@ -1355,7 +1214,6 @@ class AntigravityBridgeDaemon:
             chat_id = msg.get("chat", {}).get("id", user_id)
             caption = (msg.get("caption") or "").strip()
             text = (msg.get("text") or caption).strip()
-            reply_to_msg = msg.get("reply_to_message")
 
             # 1. 首次配對與白名單驗證
             if self.allowed_user_id == 0:
@@ -1386,62 +1244,9 @@ class AntigravityBridgeDaemon:
             if not text:
                 return
 
-            # 🌟 4. 判斷是否有「引用回覆 (Reply-To)」以進行精準路由！
-            target_proj = self.current_project
-            target_cwd = self.current_cwd
-            target_agent_name = f"⚡ {self.current_project} Agent"
-            target_conv = self.target_conv_id
-            is_reply_routing = False
+            logger.info(f"📩 收到夥伴手機訊息: {text}")
 
-            if reply_to_msg:
-                reply_id = reply_to_msg.get("message_id")
-                reply_text = reply_to_msg.get("text", "")
-                
-                # A. 先從內存 Map 查詢
-                matched_ctx = self.message_context_map.get(reply_id)
-                
-                # B. 若無則從文字內容解析 Agent 標籤
-                if not matched_ctx and reply_text:
-                    if "鈣鈦礦" in reply_text or "Perovskite" in reply_text:
-                        matched_ctx = {
-                            "project": "Perovskite",
-                            "agent_name": "🧪 鈣鈦礦 Agent (Perovskite)",
-                            "cwd": os.path.join(self.workspace_root, "Perovskite"),
-                            "conv_id": self._find_conv_id_for_project("Perovskite")
-                        }
-                    elif "手機維修" in reply_text or "視覺" in reply_text:
-                        matched_ctx = {
-                            "project": "視覺動態效果手機待修",
-                            "agent_name": "📱 手機維修與視覺 Agent",
-                            "cwd": os.path.join(self.workspace_root, "視覺動態效果手機待修"),
-                            "conv_id": self._find_conv_id_for_project("視覺動態效果手機待修")
-                        }
-                    elif "BalatroMaker" in reply_text:
-                        matched_ctx = {
-                            "project": "BalatroMaker",
-                            "agent_name": "🎮 BalatroMaker Agent",
-                            "cwd": os.path.join(self.workspace_root, "BalatroMaker"),
-                            "conv_id": self._find_conv_id_for_project("BalatroMaker")
-                        }
-                    elif "任務" in reply_text or "Tasks" in reply_text:
-                        matched_ctx = {
-                            "project": "任務",
-                            "agent_name": "⚡ 任務 Agent (Tasks & Tools)",
-                            "cwd": os.path.join(self.workspace_root, "任務"),
-                            "conv_id": self._find_conv_id_for_project("任務")
-                        }
-
-                if matched_ctx:
-                    target_proj = matched_ctx["project"]
-                    target_cwd = matched_ctx["cwd"]
-                    target_agent_name = matched_ctx["agent_name"]
-                    target_conv = matched_ctx.get("conv_id", self._find_conv_id_for_project(target_proj))
-                    is_reply_routing = True
-                    logger.info(f"🎯 偵測到夥伴引用回覆！精準對接 ➔ [{target_agent_name}] ({target_proj})")
-
-            logger.info(f"📩 收到夥伴手機訊息: {text} (目標: {target_agent_name})")
-
-            # 5. 系統指令路由
+            # 4. 手機專屬斜線指令路由
             if text.startswith("/start") or text.startswith("/help") or text.startswith("/pin"):
                 self.client.set_bot_commands()
                 self.send_pin_guide(chat_id)
@@ -1512,42 +1317,27 @@ class AntigravityBridgeDaemon:
                 self.client.send_message(chat_id, tree_text, reply_markup=kb)
 
             elif text.startswith("/ls") or text.startswith("/dir"):
-                ls_text = self.list_current_directory_files(cwd=target_cwd, proj_name=target_proj)
+                ls_text = self.list_current_directory_files(cwd=self.current_cwd, proj_name=self.current_project)
                 self.client.send_message(chat_id, ls_text, reply_markup=self.get_project_keyboard())
 
             elif text.startswith("/cat ") or text.startswith("/view "):
                 filename = text.split(" ", 1)[1].strip()
-                content = self.read_file_content(filename, cwd=target_cwd)
+                content = self.read_file_content(filename, cwd=self.current_cwd)
                 self.client.send_message(chat_id, content)
-
-            elif text.startswith("/sessions"):
-                sessions = TranscriptSyncEngine.get_all_sessions()
-                if not sessions:
-                    self.client.send_message(chat_id, "⚠️ 目前電腦端無活躍的對話視窗記錄。")
-                    return
-
-                sess_text = "🎛️ **電腦端所有 Agent 視窗清單 (全域同步中)**：\n\n"
-                for i, s in enumerate(sessions[:4], 1):
-                    sess_text += (
-                        f"**[{i}] {s['name']}**\n"
-                        f"   💬 最近主題：`{s['last_msg'][:30]}`\n"
-                        f"   🕒 最後活躍：{s['mtime_str']}\n\n"
-                    )
-                self.client.send_message(chat_id, sess_text)
 
             elif text.startswith("/status"):
                 status_text = (
-                    "💻 **電腦端 Agent 狀態報告** 🌟\n\n"
-                    f"• **當前預設專案**：`{self.current_project}`\n"
+                    "📱 **手機專屬獨立 Agent 狀態報告** 🌟\n\n"
+                    f"• **當前工作專案**：`{self.current_project}`\n"
                     f"• **實體工作目錄**：`{self.current_cwd}`\n"
                     f"• **圖片預設目標**：`{self.target_upload_name}`\n"
                     f"• **圖片實體路徑**：`{self.target_upload_dir}`\n"
                     f"• **臨時存放區**：`{STAGING_DIR}`\n"
                     "• **AI 行動大腦**：🟢 在線 (NVIDIA Llama-3.1 旗艦核心)\n"
-                    "• **同步與分流**：🟢 引用回覆精準路由 + 批次合流防刷屏\n"
+                    "• **架構模式**：🟢 手機獨立專屬視窗 (零衝突)\n"
                     "• **工作狀態**：🟢 隨時在線待命 (Ready for Action)\n"
-                    f"• **螢幕收件匣**：`📱_手機Telegram即時收件匣.md`\n"
-                    f"• **記憶緩衝區**：`pending_sync.md`"
+                    f"• **即時收件匣**：`Telegram_Agent_Bridge/📱_手機Telegram即時收件匣.md`\n"
+                    f"• **歷史紀錄**：`Telegram_Agent_Bridge/📱_手機Telegram歷史紀錄.log`"
                 )
                 self.client.send_message(chat_id, status_text)
 
@@ -1564,33 +1354,34 @@ class AntigravityBridgeDaemon:
 
             elif text.startswith("/clear"):
                 try:
+                    self.mobile_chat_history.clear()
                     with open(INBOX_FILE, "w", encoding="utf-8") as f:
                         f.write("# 📱 手機 Telegram ⇄ 電腦螢幕即時收件匣\n\n> 🟢 閒置中，等待夥伴新指令 ✨\n")
-                    self.client.send_message(chat_id, "🧹 已重置電腦螢幕收件匣！")
+                    self.client.send_message(chat_id, "🧹 已重置手機即時收件匣與對話記憶！")
                 except Exception as e:
                     self.client.send_message(chat_id, f"❌ 重置失敗：{e}")
 
             elif text.startswith("/run "):
                 cmd = text[5:].strip()
-                self.client.send_message(chat_id, f"⚡ 正在於 `{target_proj}` 執行：`{cmd}`...")
-                output = self.execute_command_sync(cmd, cwd=target_cwd)
+                self.client.send_message(chat_id, f"⚡ 正在於 `{self.current_project}` 執行：`{cmd}`...")
+                output = self.execute_command_sync(cmd, cwd=self.current_cwd)
                 self.client.send_message(chat_id, output)
-                TranscriptSyncEngine.sync_to_ai_memory(f"執行終端指令 `{cmd}` ({target_proj})", target_proj)
+                MobileStorageManager.sync_to_ai_memory(f"執行終端指令 `{cmd}` ({self.current_project})", self.current_project)
 
             else:
                 # 🌟 自然語言提問或行動指令
-                TranscriptSyncEngine.record_mobile_inbox(user_id, text, target_agent_name, status="🟡 正在處理中...")
+                MobileStorageManager.record_inbox(user_id, text, status="🟡 正在處理中...")
                 
-                routing_note = f"\n🎯 **引用定向**：`{target_agent_name}`" if is_reply_routing else f"\n🎯 **目標專案**：`{target_proj}`"
                 clean_reply = (
-                    f"📥 **已收到夥伴指令！**{routing_note}\n"
+                    f"📥 **已收到夥伴指令！**\n"
+                    f"🎯 **目標專案**：`{self.current_project}`\n"
                     f"💬 「{text}」\n\n"
-                    f"⏳ **Working...** (正在自動處理中 🚀)"
+                    f"⏳ **Working...** (手機專屬 Agent 正在處理中 🚀)"
                 )
-                working_msg_id = self.client.send_message(chat_id, clean_reply, reply_to_message_id=msg.get("message_id") if is_reply_routing else None)
+                working_msg_id = self.client.send_message(chat_id, clean_reply)
                 self.client.send_chat_action(chat_id, "typing")
 
-                self.process_ai_question_async(chat_id, user_id, text, target_proj, target_cwd, target_conv, target_agent_name, working_msg_id, is_reply_routing=is_reply_routing)
+                self.process_ai_question_async(chat_id, user_id, text, working_msg_id)
 
         except Exception as e:
             logger.error(f"處理訊息過程異常: {e}", exc_info=True)
@@ -1602,17 +1393,15 @@ class AntigravityBridgeDaemon:
 
         ensure_single_instance(47890)
 
-        logger.info("🚀 Antigravity Telegram 全自動檔案管家 & 引用回覆精準分流 Agent 已啟動！")
+        logger.info("🚀 Antigravity Telegram 手機專屬獨立 Agent 已啟動！")
         logger.info(f"📱 授權使用者 ID: {self.allowed_user_id}")
-        logger.info(f"📁 當前預設專案: {self.current_project} ({self.current_cwd})")
+        logger.info(f"📁 當前工作專案: {self.current_project} ({self.current_cwd})")
         logger.info(f"🖼️ 圖片預設目標: {self.target_upload_name} ({self.target_upload_dir})")
 
         try:
             self.client.set_bot_commands()
         except Exception as e:
             logger.warning(f"註冊選單失敗: {e}")
-
-        self.start_live_sync_thread()
 
         offset = 0
         while self.running:
