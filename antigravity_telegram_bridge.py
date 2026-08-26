@@ -180,9 +180,11 @@ class TelegramClient:
 
     def set_bot_commands(self) -> bool:
         commands = [
-            {"command": "projects", "description": "📁 切換專案資料夾 (鈣鈦礦/任務/手機維修)"},
-            {"command": "staging", "description": "📦 查看【手機上傳臨時存放區】檔案"},
+            {"command": "tree", "description": "🧭 IDE 檔案總管 / 資料夾樹地圖 (點擊切換)"},
+            {"command": "cd", "description": "🎯 切換工作專案或目錄 (/cd <關鍵字>)"},
+            {"command": "pwd", "description": "📍 檢視當前所在專案與完整目錄"},
             {"command": "ls", "description": "📂 列出當前專案目錄下的所有檔案"},
+            {"command": "staging", "description": "📦 查看【手機上傳臨時存放區】檔案"},
             {"command": "sessions", "description": "🎛️ 檢視電腦所有在線 Agent 視窗"},
             {"command": "status", "description": "📊 檢視連線狀態與健康度"},
             {"command": "apk", "description": "📦 傳送最新 Samsung A32 氣氛燈 APK"},
@@ -617,27 +619,91 @@ class AntigravityBridgeDaemon:
                 return s["id"]
         return self.target_conv_id
 
+    def get_directory_browser_keyboard(self, target_path: Optional[str] = None) -> Tuple[str, Dict[str, Any]]:
+        """動態生成 IDE 風格檔案總管 / 資料夾樹地圖 (Inline Keyboard)"""
+        curr = target_path if target_path and os.path.exists(target_path) else self.current_cwd
+        if not os.path.exists(curr):
+            curr = self.workspace_root
+            
+        rel_curr = os.path.relpath(curr, self.workspace_root).replace("\\", "/")
+        if rel_curr == ".":
+            rel_curr = "🏠 GitHub 根目錄 (Workspace Root)"
+            
+        entries = []
+        try:
+            ignored = {".git", "__pycache__", "node_modules", "venv", ".gemini", ".vscode", "tempmediaStorage", ".system_generated"}
+            entries = [d for d in os.listdir(curr) if os.path.isdir(os.path.join(curr, d)) and d not in ignored and not d.startswith(".")]
+        except Exception:
+            entries = []
+            
+        keyboard_buttons = []
+        
+        # 1. 子資料夾按鈕 (每行 2 個)
+        row = []
+        for d in entries[:10]:
+            sub_abs = os.path.join(curr, d)
+            sub_rel = os.path.relpath(sub_abs, self.workspace_root).replace("\\", "/")
+            row.append({"text": f"📁 {d}", "callback_data": f"nav_dir:{sub_rel}"})
+            if len(row) == 2:
+                keyboard_buttons.append(row)
+                row = []
+        if row:
+            keyboard_buttons.append(row)
+            
+        # 2. 導航控制列 (上一層 / 回根目錄)
+        nav_row = []
+        if os.path.abspath(curr) != os.path.abspath(self.workspace_root):
+            parent_abs = os.path.dirname(curr)
+            parent_rel = os.path.relpath(parent_abs, self.workspace_root).replace("\\", "/")
+            nav_row.append({"text": "⬆️ 返回上一層", "callback_data": f"nav_dir:{parent_rel}"})
+            nav_row.append({"text": "🏠 回根目錄", "callback_data": "nav_dir:."})
+        if nav_row:
+            keyboard_buttons.append(nav_row)
+            
+        # 3. 動作控制列
+        curr_rel_code = os.path.relpath(curr, self.workspace_root).replace("\\", "/")
+        keyboard_buttons.append([
+            {"text": "✅ 鎖定此目錄為工作專案", "callback_data": f"set_proj:{curr_rel_code}"},
+            {"text": "📂 查看檔案清單 (/ls)", "callback_data": f"action_ls:{curr_rel_code}"}
+        ])
+        keyboard_buttons.append([
+            {"text": "🖼️ 設為圖片目標", "callback_data": f"set_target_dir:{curr_rel_code}"},
+            {"text": "📦 查看暫存區", "callback_data": "action:staging"}
+        ])
+        
+        text = (
+            "🧭 **【IDE 檔案總管 / 資料夾樹地圖】** 🌟\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📍 **當前瀏覽目錄**：`{rel_curr}`\n"
+            f"📁 **實體路徑**：`{curr}`\n"
+            f"📊 **子資料夾數量**：`{len(entries)} 個`\n\n"
+            "👇 **點擊下方資料夾即可層層深入，點擊「✅ 鎖定」即完成切換！**"
+        )
+        return text, {"inline_keyboard": keyboard_buttons}
+
     def get_project_keyboard(self) -> Dict[str, Any]:
         keyboard = {
             "inline_keyboard": [
+                [
+                    {"text": "🧭 檔案總管 / 樹地圖 (/tree)", "callback_data": "action:tree"},
+                    {"text": "📂 查看當前檔案 (/ls)", "callback_data": "action:ls"}
+                ],
                 [
                     {"text": "⚡ 任務與工具", "callback_data": "set_proj:任務"},
                     {"text": "🧪 鈣鈦礦 (Perovskite)", "callback_data": "set_proj:Perovskite"}
                 ],
                 [
-                    {"text": "📱 視覺與手機待修", "callback_data": "set_proj:視覺動態效果手機待修"},
-                    {"text": "🎮 BalatroMaker", "callback_data": "set_proj:BalatroMaker"}
+                    {"text": "📱 視覺動態效果/mobile", "callback_data": "set_proj:視覺動態效果/mobile"},
+                    {"text": "📱 視覺動態效果(根)", "callback_data": "set_proj:視覺動態效果"}
                 ],
                 [
                     {"text": "🤖 Telegram Bridge", "callback_data": "set_proj:Telegram_Agent_Bridge"},
-                    {"text": "🖼️ 存圖目標: illit", "callback_data": "set_target:illit"}
+                    {"text": "🎮 BalatroMaker", "callback_data": "set_proj:BalatroMaker"}
                 ],
                 [
-                    {"text": "🖥️ 存圖目標: 桌面", "callback_data": "set_target:desktop"},
-                    {"text": "📦 存圖目標: 臨時存放區", "callback_data": "set_target:staging"}
-                ],
-                [
-                    {"text": "📂 查看當前目錄檔案 (/ls)", "callback_data": "action:ls"}
+                    {"text": "🖼️ 存圖: illit", "callback_data": "set_target:illit"},
+                    {"text": "🖥️ 存圖: 桌面", "callback_data": "set_target:desktop"},
+                    {"text": "📦 存圖: 暫存區", "callback_data": "set_target:staging"}
                 ]
             ]
         }
@@ -804,6 +870,92 @@ class AntigravityBridgeDaemon:
         except Exception as e:
             return f"❌ 讀取檔案失敗：`{e}`"
 
+    def get_all_workspace_directories(self) -> List[Tuple[str, str]]:
+        """掃描 workspace_root 下的所有有效專案與子目錄 (絕對路徑, 相對路徑)"""
+        results = []
+        if not os.path.exists(self.workspace_root):
+            return results
+        
+        ignored = {".git", "__pycache__", "node_modules", "venv", ".gemini", ".vscode", "tempmediaStorage", ".system_generated"}
+        for root, dirs, _ in os.walk(self.workspace_root):
+            dirs[:] = [d for d in dirs if d not in ignored and not d.startswith(".")]
+            for d in dirs:
+                abs_p = os.path.join(root, d)
+                rel_p = os.path.relpath(abs_p, self.workspace_root).replace("\\", "/")
+                results.append((abs_p, rel_p))
+        return results
+
+    def find_best_matching_directory(self, query_text: str) -> Tuple[Optional[str], Optional[str]]:
+        """模糊智慧搜尋工作區資料夾 (支援多層子目錄如 視覺動態效果/mobile)"""
+        q = query_text.strip().lower().replace("\\", "/")
+        if not q:
+            return None, None
+        
+        all_dirs = self.get_all_workspace_directories()
+        
+        # 1. 完整相對路徑比對 (e.g. "視覺動態效果/mobile" 或 "mobile")
+        for abs_p, rel_p in all_dirs:
+            if rel_p.lower() == q:
+                return abs_p, rel_p
+                
+        # 2. 結尾目錄完全比對 (例如 "mobile" 匹配至 "視覺動態效果/mobile")
+        for abs_p, rel_p in all_dirs:
+            folder_name = os.path.basename(abs_p).lower()
+            if folder_name == q:
+                return abs_p, rel_p
+                
+        # 3. 關鍵字複合比對 (例如 "視覺" 與 "mobile")
+        tokens = [t for t in q.replace("/", " ").replace("\\", " ").split() if len(t) > 1]
+        if tokens:
+            for abs_p, rel_p in all_dirs:
+                rel_lower = rel_p.lower()
+                if all(t in rel_lower for t in tokens):
+                    return abs_p, rel_p
+                    
+        # 4. 部分包含比對
+        for abs_p, rel_p in all_dirs:
+            rel_lower = rel_p.lower()
+            folder_name = os.path.basename(abs_p).lower()
+            if q in rel_lower or q in folder_name:
+                return abs_p, rel_p
+                
+        return None, None
+
+    def try_switch_working_directory(self, user_text: str) -> Optional[str]:
+        """自然語言與語音智慧辨識切換工作專案與目錄"""
+        t = user_text.strip()
+        nav_verbs = ["切到", "切換", "開", "移到", "進入", "去", "打開", "跳到", "到", "在", "層", "資料夾", "專案", "修補", "做", "前往", "cd "]
+        has_nav_intent = any(v in t for v in nav_verbs) or t.startswith("/") or "mobile" in t.lower() or "視覺" in t or "鈣鈦礦" in t
+        
+        cleaned = t
+        for v in nav_verbs:
+            cleaned = cleaned.replace(v, " ")
+        cleaned = cleaned.strip()
+
+        matched_dir, rel_name = self.find_best_matching_directory(cleaned)
+        if not matched_dir:
+            matched_dir, rel_name = self.find_best_matching_directory(t)
+
+        if matched_dir and (has_nav_intent or t.lower() == rel_name.lower() or t.lower() == os.path.basename(matched_dir).lower()):
+            self.current_cwd = matched_dir
+            self.current_project = rel_name
+            self.config["current_project"] = rel_name
+            self.config["current_cwd"] = matched_dir
+            save_config(self.config)
+            logger.info(f"🎯 夥伴切換工作專案與目錄至：{rel_name} ({matched_dir})")
+            
+            ls_preview = self.list_current_directory_files(cwd=matched_dir, proj_name=rel_name)
+            _, kb = self.get_directory_browser_keyboard(matched_dir)
+            res = (
+                f"🎯 **【已成功切換至專案與目錄：{rel_name}】** 🌟\n"
+                f"📍 **實體路徑**：`{matched_dir}`\n"
+                "━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"{ls_preview}\n\n"
+                "💡 *提示：接下來發送的所有指令、提問與程式碼編寫，都將直接作用於此目錄！*"
+            )
+            return res
+        return None
+
     def resolve_target_directory(self, text: str) -> Tuple[Optional[str], Optional[str]]:
         t = text.lower()
         if "illit" in t or "圖片/illit" in t or "照片/illit" in t:
@@ -812,21 +964,21 @@ class AntigravityBridgeDaemon:
             return DESKTOP_DIR, "🖥️ 電腦桌面 (Desktop)"
         if "telegram" in t or "bridge" in t or "橋接" in text or "04" in text:
             return os.path.join(self.workspace_root, "Telegram_Agent_Bridge"), "🤖 Telegram_Agent_Bridge"
-        if "鈣鈦礦" in text or "perovskite" in t:
-            return os.path.join(self.workspace_root, "Perovskite"), "🧪 鈣鈦礦 (Perovskite)"
-        if "手機維修" in text or "視覺" in text:
-            return os.path.join(self.workspace_root, "視覺動態效果手機待修"), "📱 視覺動態效果手機待修"
         if "暫存" in text or "臨時" in text or "staging" in t:
             return STAGING_DIR, "📦 手機上傳臨時存放區"
         if "圖片" in text or "pictures" in t or "相片" in text:
             return PICTURES_DIR, "🖼️ 電腦圖片 (Pictures)"
-        if "任務" in text:
-            return os.path.join(self.workspace_root, "任務"), "⚡ 任務 (Tasks & Tools)"
+            
+        # 智慧動態比對其他所有工作目錄
+        matched_dir, rel_name = self.find_best_matching_directory(text)
+        if matched_dir:
+            return matched_dir, f"📁 {rel_name}"
+            
         return None, None
 
     def try_set_target_directory(self, user_text: str) -> Optional[str]:
         target_dir, dest_name = self.resolve_target_directory(user_text)
-        if target_dir and ("放" in user_text or "存" in user_text or "設" in user_text or "換" in user_text or "到" in user_text):
+        if target_dir and ("放" in user_text or "存" in user_text or "設" in user_text or "換" in user_text or "到" in user_text or "目標" in user_text):
             os.makedirs(target_dir, exist_ok=True)
             self.target_upload_dir = target_dir
             self.target_upload_name = dest_name
@@ -1008,22 +1160,67 @@ class AntigravityBridgeDaemon:
         chat_id = msg.get("chat", {}).get("id", self.allowed_user_id)
         msg_id = msg.get("message_id")
 
-        if data.startswith("set_proj:"):
+        if data.startswith("nav_dir:"):
+            rel_path = data.split("nav_dir:")[1]
+            if rel_path == "." or not rel_path:
+                target_abs = self.workspace_root
+            else:
+                target_abs = os.path.join(self.workspace_root, rel_path.replace("/", "\\"))
+            self.client.answer_callback_query(cb_id, text=f"瀏覽：{rel_path}")
+            tree_text, kb = self.get_directory_browser_keyboard(target_abs)
+            self.client.edit_message_text(chat_id, msg_id, tree_text, reply_markup=kb)
+
+        elif data.startswith("set_proj:"):
             proj = data.split("set_proj:")[1]
-            self.current_project = proj
-            self.current_cwd = os.path.join(self.workspace_root, proj.replace("/", "\\"))
+            if proj == "." or not proj:
+                self.current_project = "GitHub 根目錄"
+                self.current_cwd = self.workspace_root
+            else:
+                self.current_project = proj
+                self.current_cwd = os.path.join(self.workspace_root, proj.replace("/", "\\"))
             os.makedirs(self.current_cwd, exist_ok=True)
-            self.config["current_project"] = proj
+            self.config["current_project"] = self.current_project
+            self.config["current_cwd"] = self.current_cwd
             save_config(self.config)
             
-            self.client.answer_callback_query(cb_id, text=f"已切換至專案：{proj}")
+            self.client.answer_callback_query(cb_id, text=f"✅ 已切換至專案：{self.current_project}")
+            ls_preview = self.list_current_directory_files(cwd=self.current_cwd, proj_name=self.current_project)
             confirm_text = (
-                f"🎯 **【已成功切換至專案：{proj}】** 🌟\n\n"
-                f"📍 **當前工作路徑**：`{self.current_cwd}`\n\n"
+                f"🎯 **【已成功切換至專案與目錄：{self.current_project}】** 🌟\n"
+                f"📍 **當前工作路徑**：`{self.current_cwd}`\n"
+                "━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"{ls_preview}\n\n"
                 "💡 *提示：接下來手機發送的所有提問、指令與檔案操作，都將直接作用於此專案！*"
             )
-            self.client.edit_message_text(chat_id, msg_id, confirm_text, reply_markup=self.get_project_keyboard())
+            _, kb = self.get_directory_browser_keyboard(self.current_cwd)
+            self.client.edit_message_text(chat_id, msg_id, confirm_text, reply_markup=kb)
             logger.info(f"🎯 夥伴在手機端切換工作專案至：{self.current_cwd}")
+
+        elif data.startswith("action_ls:"):
+            rel_path = data.split("action_ls:")[1]
+            target_abs = self.workspace_root if rel_path in [".", ""] else os.path.join(self.workspace_root, rel_path.replace("/", "\\"))
+            self.client.answer_callback_query(cb_id, text="正在獲取檔案清單...")
+            ls_text = self.list_current_directory_files(cwd=target_abs, proj_name=rel_path)
+            _, kb = self.get_directory_browser_keyboard(target_abs)
+            self.client.edit_message_text(chat_id, msg_id, ls_text, reply_markup=kb)
+
+        elif data.startswith("set_target_dir:"):
+            rel_path = data.split("set_target_dir:")[1]
+            target_abs = self.workspace_root if rel_path in [".", ""] else os.path.join(self.workspace_root, rel_path.replace("/", "\\"))
+            dest_name = f"📁 {rel_path}"
+            self.target_upload_dir = target_abs
+            self.target_upload_name = dest_name
+            self.config["target_upload_dir"] = target_abs
+            self.config["target_upload_name"] = dest_name
+            save_config(self.config)
+            
+            self.client.answer_callback_query(cb_id, text=f"已設定存圖目標：{dest_name}")
+            confirm_text = (
+                f"🎯 **【已成功設定上傳目標：{dest_name}】** 🌟\n\n"
+                f"📂 **目標目錄**：`{target_abs}`\n\n"
+                "📥 **接下來你在手機傳送的所有照片**，都會直接自動存入此資料夾，並自動合流為 1 則匯總通知！✨"
+            )
+            self.client.send_message(chat_id, confirm_text, reply_markup=self.get_project_keyboard())
 
         elif data.startswith("set_target:"):
             target_key = data.split("set_target:")[1]
@@ -1049,6 +1246,11 @@ class AntigravityBridgeDaemon:
             )
             self.client.send_message(chat_id, confirm_text, reply_markup=self.get_project_keyboard())
 
+        elif data == "action:tree":
+            self.client.answer_callback_query(cb_id, text="正在載入檔案總管...")
+            tree_text, kb = self.get_directory_browser_keyboard(self.current_cwd)
+            self.client.edit_message_text(chat_id, msg_id, tree_text, reply_markup=kb)
+
         elif data == "action:staging":
             self.client.answer_callback_query(cb_id, text="正在讀取臨時存放區...")
             staging_text = self.list_staging_files()
@@ -1062,7 +1264,19 @@ class AntigravityBridgeDaemon:
     def process_ai_question_async(self, chat_id: int, user_id: int, text: str, target_project: str, target_cwd: str, target_conv_id: str, agent_name: str, working_msg_id: Optional[int], is_reply_routing: bool = False):
         def _task():
             try:
-                # 🌟 1. 檢測是否為更改存放目標指令
+                # 🌟 1. 優先檢測是否為切換工作目錄 / 專案指令
+                switch_res = self.try_switch_working_directory(text)
+                if switch_res:
+                    edited = False
+                    if working_msg_id:
+                        edited = self.client.edit_message_text(chat_id, working_msg_id, switch_res)
+                    if not edited:
+                        self.client.send_message(chat_id, switch_res)
+                    TranscriptSyncEngine.record_mobile_inbox(user_id, text, self.current_project, status="🟢 已切換工作專案與目錄", answer=switch_res)
+                    TranscriptSyncEngine.sync_to_ai_memory(f"切換專案與目錄至：{self.current_project}", self.current_project)
+                    return
+
+                # 🌟 2. 檢測是否為更改存圖目標指令
                 target_res = self.try_set_target_directory(text)
                 if target_res:
                     edited = False
@@ -1074,7 +1288,7 @@ class AntigravityBridgeDaemon:
                     TranscriptSyncEngine.sync_to_ai_memory(f"設定圖片目標目錄：{self.target_upload_name}", target_project)
                     return
 
-                # 🌟 2. 檢測是否為後續整批檔案搬移指令
+                # 🌟 3. 檢測是否為後續整批檔案搬移指令
                 action_result = self.try_autonomous_file_action(text)
                 if action_result:
                     edited = False
@@ -1086,7 +1300,7 @@ class AntigravityBridgeDaemon:
                     TranscriptSyncEngine.sync_to_ai_memory(f"自動執行檔案搬移：{text[:40]}", target_project)
                     return
 
-                # 3. 一般問題：調用高效 AI 思考大腦 (精準定向專案)
+                # 4. 一般問題：調用高效 AI 思考大腦 (精準定向專案 + 包含當前目錄標頭)
                 conv_id = target_conv_id if target_conv_id else self._find_conv_id_for_project(target_project)
                 history = TranscriptSyncEngine.read_conversation_history(conv_id, limit=3)
                 logger.info(f"🤖 正在為夥伴深度解答 ({agent_name}): {text[:40]}...")
@@ -1095,7 +1309,12 @@ class AntigravityBridgeDaemon:
                 answer = AIBrainEngine.query_ai(text, target_project, target_cwd, self.target_upload_name, self.target_upload_dir, history=history)
                 
                 routing_tag = "🎯 引用對接" if is_reply_routing else "✨ 專屬解答"
-                reply_text = f"**【{agent_name} {routing_tag}】** 🌟\n\n{answer}"
+                header = (
+                    f"📍 **【當前專案與目錄】**：`{target_project}`\n"
+                    f"📂 `{target_cwd}`\n"
+                    "━━━━━━━━━━━━━━━━━━━━━\n\n"
+                )
+                reply_text = f"**【{agent_name} {routing_tag}】** 🌟\n\n{header}{answer}"
                 
                 edited = False
                 if working_msg_id:
@@ -1231,15 +1450,66 @@ class AntigravityBridgeDaemon:
                 staging_text = self.list_staging_files()
                 self.client.send_message(chat_id, staging_text, reply_markup=self.get_project_keyboard())
 
-            elif text.startswith("/projects") or text.startswith("/cd") or text.startswith("/folder"):
-                proj_text = (
-                    "📁 **【專案與資料夾選擇器】** 🌟\n\n"
-                    f"📍 **當前預設專案**：`{self.current_project}`\n"
-                    f"📂 **工作路徑**：`{self.current_cwd}`\n"
-                    f"🖼️ **圖片目標**：`{self.target_upload_name}`\n\n"
-                    "👇 **請點擊下方按鈕切換你要操作的專案或圖片目錄**："
+            elif text.startswith("/tree") or text.startswith("/explorer"):
+                tree_text, kb = self.get_directory_browser_keyboard(self.current_cwd)
+                self.client.send_message(chat_id, tree_text, reply_markup=kb)
+
+            elif text.startswith("/cd"):
+                parts = text.split(" ", 1)
+                if len(parts) > 1 and parts[1].strip():
+                    target_arg = parts[1].strip()
+                    if target_arg in ["..", "../", "上一層"]:
+                        parent_abs = os.path.dirname(self.current_cwd)
+                        if self.workspace_root in parent_abs or parent_abs == self.workspace_root:
+                            self.current_cwd = parent_abs
+                            self.current_project = os.path.relpath(parent_abs, self.workspace_root).replace("\\", "/")
+                            if self.current_project == ".":
+                                self.current_project = "GitHub 根目錄"
+                            self.config["current_project"] = self.current_project
+                            self.config["current_cwd"] = self.current_cwd
+                            save_config(self.config)
+                            ls_preview = self.list_current_directory_files(cwd=self.current_cwd, proj_name=self.current_project)
+                            _, kb = self.get_directory_browser_keyboard(self.current_cwd)
+                            self.client.send_message(chat_id, f"🎯 **已返回上一層目錄：{self.current_project}**\n📍 `{self.current_cwd}`\n\n{ls_preview}", reply_markup=kb)
+                        else:
+                            self.client.send_message(chat_id, "⚠️ 已到達工作區最頂層目錄。")
+                    elif target_arg in ["/", "\\", "~", "root"]:
+                        self.current_cwd = self.workspace_root
+                        self.current_project = "GitHub 根目錄"
+                        self.config["current_project"] = self.current_project
+                        self.config["current_cwd"] = self.current_cwd
+                        save_config(self.config)
+                        ls_preview = self.list_current_directory_files(cwd=self.current_cwd, proj_name=self.current_project)
+                        _, kb = self.get_directory_browser_keyboard(self.current_cwd)
+                        self.client.send_message(chat_id, f"🎯 **已切換至根目錄：{self.current_project}**\n📍 `{self.current_cwd}`\n\n{ls_preview}", reply_markup=kb)
+                    else:
+                        switch_res = self.try_switch_working_directory(target_arg)
+                        if switch_res:
+                            _, kb = self.get_directory_browser_keyboard(self.current_cwd)
+                            self.client.send_message(chat_id, switch_res, reply_markup=kb)
+                        else:
+                            self.client.send_message(chat_id, f"⚠️ 找不到與 `{target_arg}` 相符的資料夾！你可以輸入 `/tree` 瀏覽完整樹狀圖。")
+                else:
+                    tree_text, kb = self.get_directory_browser_keyboard(self.current_cwd)
+                    self.client.send_message(chat_id, tree_text, reply_markup=kb)
+
+            elif text.startswith("/pwd") or text.startswith("/where"):
+                rel_p = os.path.relpath(self.current_cwd, self.workspace_root).replace("\\", "/")
+                pwd_text = (
+                    "📍 **【當前工作位置與專案】** 🌟\n"
+                    "━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🎯 **專案名稱**：`{self.current_project}`\n"
+                    f"📁 **實體路徑**：`{self.current_cwd}`\n"
+                    f"🌐 **相對於根目錄**：`{rel_p}`\n"
+                    f"🖼️ **圖片上傳目標**：`{self.target_upload_name}` (`{self.target_upload_dir}`)\n\n"
+                    "💡 *如需切換，可直接點選下方按鈕或輸入 `/cd <目錄名>` / `/tree`*"
                 )
-                self.client.send_message(chat_id, proj_text, reply_markup=self.get_project_keyboard())
+                _, kb = self.get_directory_browser_keyboard(self.current_cwd)
+                self.client.send_message(chat_id, pwd_text, reply_markup=kb)
+
+            elif text.startswith("/projects") or text.startswith("/folder"):
+                tree_text, kb = self.get_directory_browser_keyboard(self.current_cwd)
+                self.client.send_message(chat_id, tree_text, reply_markup=kb)
 
             elif text.startswith("/ls") or text.startswith("/dir"):
                 ls_text = self.list_current_directory_files(cwd=target_cwd, proj_name=target_proj)
