@@ -1,6 +1,6 @@
 # 🚀 Antigravity 可移動執行與 VS Code 擴充整合架構指南
 
-> 📌 **專案目錄**：`c:\Users\yexia\Documents\ShihWei\NTNU\GitHub\04_antigravity可移動執行\`  
+> 📌 **專案目錄**：`c:\Users\yexia\Documents\ShihWei\NTNU\GitHub\Telegram_Agent_Bridge\`  
 > 🎯 **核心目標**：
 > 1. **單一 IDE 體驗**：在標準 VS Code 中安裝擴充模組，直接對話並調用 Antigravity Agent，無需切換兩個 IDE。
 > 2. **手機端 (vivo) 遠端操控電腦 Agent**：人離開房間時，透過手機遠端下指令給開機中的電腦，由電腦端 Agent 自動編寫程式、編譯 APK、執行測試並即時回報進度至手機，**徹底擺脫雲端 Spark 免費用量限制**！

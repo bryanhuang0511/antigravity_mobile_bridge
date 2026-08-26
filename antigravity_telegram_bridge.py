@@ -629,7 +629,7 @@ class AntigravityBridgeDaemon:
                     {"text": "🎮 BalatroMaker", "callback_data": "set_proj:BalatroMaker"}
                 ],
                 [
-                    {"text": "📁 04_antigravity可移動執行", "callback_data": "set_proj:04_antigravity可移動執行"},
+                    {"text": "🤖 Telegram Bridge", "callback_data": "set_proj:Telegram_Agent_Bridge"},
                     {"text": "🖼️ 存圖目標: illit", "callback_data": "set_target:illit"}
                 ],
                 [
@@ -810,8 +810,8 @@ class AntigravityBridgeDaemon:
             return ILLIT_DIR, "🖼️ 圖片/illit"
         if "桌面" in text or "桌布" in text or "desktop" in t:
             return DESKTOP_DIR, "🖥️ 電腦桌面 (Desktop)"
-        if "04" in text:
-            return os.path.join(self.workspace_root, "04_antigravity可移動執行"), "📁 04_antigravity可移動執行"
+        if "telegram" in t or "bridge" in t or "橋接" in text or "04" in text:
+            return os.path.join(self.workspace_root, "Telegram_Agent_Bridge"), "🤖 Telegram_Agent_Bridge"
         if "鈣鈦礦" in text or "perovskite" in t:
             return os.path.join(self.workspace_root, "Perovskite"), "🧪 鈣鈦礦 (Perovskite)"
         if "手機維修" in text or "視覺" in text:

@@ -24,12 +24,11 @@
 
 ```text
 antigravity_mobile_bridge/
-├── Telegram_Agent_Bridge/
-│   ├── antigravity_telegram_bridge.py   # 核心橋接器守護進程 (Python)
-│   ├── bridge_config.template.json      # 配置檔範本 (複製為 bridge_config.json)
-│   ├── 啟動Telegram橋接器.bat           # Windows 一鍵啟動背景守護腳本
-│   ├── 使用指南_3分鐘極速啟用.md       # 詳細啟用指南
-│   └── 手機上傳臨時存放區/             # 手機上傳照片/檔案之暫存目錄
+├── antigravity_telegram_bridge.py   # 核心橋接器守護進程 (Python)
+├── bridge_config.template.json      # 配置檔範本 (複製為 bridge_config.json)
+├── 啟動Telegram橋接器.bat           # Windows 一鍵啟動背景守護腳本
+├── 使用指南_3分鐘極速啟用.md       # 詳細啟用指南
+├── 手機上傳臨時存放區/             # 手機上傳照片/檔案之暫存目錄
 ├── Antigravity_VSCode擴充與手機遠端操控架構指南.md
 └── README.md
 ```
@@ -43,7 +42,6 @@ antigravity_mobile_bridge/
 2. 輸入 `/newbot` 建立機器人，取得專屬 **`HTTP API Token`**。
 
 ### 步驟 2：建立設定檔
-在 `Telegram_Agent_Bridge/` 目錄下：
 1. 將 `bridge_config.template.json` 複製並更名為 `bridge_config.json`。
 2. 填入你的 Bot Token：
 ```json
@@ -61,7 +59,7 @@ antigravity_mobile_bridge/
 ### 步驟 3：啟動橋接器
 - **Windows**：雙擊運行 `啟動Telegram橋接器.bat`（或在終端機執行）：
 ```powershell
-python "Telegram_Agent_Bridge\antigravity_telegram_bridge.py"
+python antigravity_telegram_bridge.py
 ```
 
 ---
