@@ -1,0 +1,20 @@
+{
+    "bot_token": "YOUR_DISCORD_BOT_TOKEN_HERE",
+    "guild_id": 0,
+    "allowed_user_id": 0,
+    "workspace_root": "c:\\Users\\yexia\\Documents\\ShihWei\\NTNU\\GitHub",
+    "current_project": "視覺動態效果\\mobile",
+    "target_upload_dir": "C:\\Users\\yexia\\Pictures\\illit",
+    "target_upload_name": "🖼️ 圖片/illit",
+    "auto_sync_agent_replies": true,
+    "ai_model": "meta/llama-3.2-11b-vision-instruct",
+    "channels": {
+        "clipboard": 0,
+        "photos": 0,
+        "notes": 0,
+        "console": 0,
+        "terminal": 0,
+        "outbox": 0,
+        "guest_chat": 0
+    }
+}

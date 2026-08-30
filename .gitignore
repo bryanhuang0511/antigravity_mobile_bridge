@@ -2,6 +2,7 @@
 # 🔒 隱私與配置防護 (Security & Secrets)
 # ==========================================
 bridge_config.json
+discord_bridge_config.json
 *.pid
 .bridge.pid
 nvidia_build.txt
@@ -12,6 +13,8 @@ nvidia_build.txt
 # ==========================================
 # 📦 暫存與即時檔案 (Staging & Media)
 # ==========================================
+手機上傳臨時存放區/*
+!手機上傳臨時存放區/.gitkeep
 Telegram_Agent_Bridge/手機上傳臨時存放區/*
 !Telegram_Agent_Bridge/手機上傳臨時存放區/.gitkeep
 *.jpg
@@ -20,6 +23,10 @@ Telegram_Agent_Bridge/手機上傳臨時存放區/*
 *.gif
 *.webp
 *.apk
+*.ogg
+*.mp3
+*.wav
+*.m4a
 
 # ==========================================
 # 📝 日誌與快取 (Logs & Caches)
@@ -28,7 +35,7 @@ Telegram_Agent_Bridge/手機上傳臨時存放區/*
 *.tmp
 __pycache__/
 *.py[cod]
-*$py.class
+*.class
 
 # ==========================================
 # 💻 IDE 與系統檔案 (System & IDEs)
