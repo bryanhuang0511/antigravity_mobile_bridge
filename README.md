@@ -1,11 +1,30 @@
-# 🎮 Antigravity Discord Agent Bridge (Discord ⇄ PC Gemini 3.7 Flash 雙向智能體工作站)
+# 🎮 Antigravity Discord Agent Bridge (已封存 / Archived)
 
-> 🚀 **隨身掌控開機中的電腦 Agent，徹底釋放 Gemini 3.7 Flash 旗艦主腦！**  
-> 透過 Discord 手機 / 電腦 App 隨身操控電腦、自動建立獨立任務討論串 (Thread)、動態資料夾樹狀圖 Select Menu 導航、跨端相片自動落地備份、遠端 PowerShell 指令操盤與最新 APK 自動推播。
+> 📦 **【專案狀態公告：已正式結案並封存備忘 (Archived & Sunset - 2026-09-03)】**  
+> 本專案為 2026 年探索「手機端遠端操控電腦 Antigravity Agent」的高可用跨端橋接原型。隨著官方生態的演進與重大實測突破，本專案已圓滿達成歷史探索使命並正式歸檔留存。
 
 ---
 
-## 🌟 核心特色 (Key Features)
+## 💡 決策脈絡與封存原因 (Architecture Evolution & Decision Rationale)
+
+### 1. 核心實測突破：雙版本完美並存
+經過夥伴實際部署與深度驗證：
+* **Antigravity 獨立桌面版 (2.0)** 與 **Antigravity IDE (VS Code 核心版本)** 在同一台 Windows 電腦上**可以 100% 同時存在、同時獨立運行**。
+* 兩者安裝路徑獨立、通訊埠自動隔離、共用 `~/.gemini/config` 的全域自訂技能與規則，完全沒有資源衝突或覆蓋問題。
+
+### 2. 官方 Web Remote 原生賦能 (`gravity.google.com`)
+* 官方 Antigravity 2.0 原生提供了全新的 **Web Remote Control** 網頁介面。
+* **PWA 與公網穿透**：手機端透過 Chrome / Brave「新增至主畫面」即可化身全螢幕 App，5G 行動網路免 VPN 直接穿透 Google 雲端中繼連回家中筆電。
+* **實體磁碟讀寫與任務調度**：在手機端下達指令，電腦本機硬碟直接執行代碼修改、測試與終端機任務。
+
+### 3. 開發者工作流之終極收斂
+* **本機沉浸開發**：坐在電腦前時，使用 **Antigravity IDE** 享受極速代碼自動補全、`Ctrl+I` 行內重構與本機除錯。
+* **隨身外出操控**：離開電腦時，後台常駐的 **Antigravity 2.0** 搭配手機 `gravity.google.com` PWA 隨身下達指令。
+* **結論**：由於官方原生生態已完整覆蓋「手機外出操控電腦 Agent」之核心痛點，無需再額外維護常駐的 Discord Bot 進程、中繼伺服器與 Bot Token，因此本專案正式封存，作為經典架構原型留存於 GitHub。
+
+---
+
+## 🌟 原專案核心特色 (Key Features - Archive Reference)
 
 - 🧠 **雙層智能協同架構 (Dual-Layer Agentic Pipeline)**：
   - 輕量管理 (查目錄/搬移/終端/問答)：由 Llama 3.2 11B 隨身管家秒回處理，0 消耗電腦對話 Token！
@@ -30,28 +49,21 @@
 ```text
 Discord_Agent_Bridge/
 ├── antigravity_discord_bridge.py   # 核心 Discord 雙向橋接器守護進程 (Python)
-├── discord_bridge_config.json      # 橋接器設定檔 (Token、Guild ID、路徑與參數)
+├── discord_bridge_config.template.json # 橋接器設定檔範本 (Token、Guild ID、路徑與參數)
 ├── 啟動Discord橋接器.bat           # Windows 一鍵啟動背景守護腳本
+├── 靜默啟動Discord橋接器.vbs       # Windows 背景無黑窗啟動腳本
+├── 停止Discord橋接器.bat           # 一鍵安全停止背景守護進程
 ├── 使用指南_3分鐘極速啟用.md       # 詳細 Discord 啟用指南
+├── Antigravity_VSCode擴充與手機遠端操控架構指南.md # 深度跨端架構研判指南
+├── 開源零Token模型驅動跨端Agent架構實戰筆記.md # 零 Token 本地模型架構筆記
 ├── 手機上傳臨時存放區/             # 手機上傳照片/檔案之暫存目錄
 ├── 📱_手機Discord即時收件匣.md     # 電腦螢幕即時收件匣 (本機獨立)
-├── 🎮_Discord歷史紀錄.log          # 手機端完整提問歷史 Log
 └── README.md
 ```
 
 ---
 
-## 🚀 快速開始 (Quick Start)
-
-### 步驟 1：啟動橋接器
-- **Windows**：雙擊運行 `啟動Discord橋接器.bat`（或在終端機執行）：
-```powershell
-python antigravity_discord_bridge.py
-```
-
----
-
-## 💬 常用 Slash 指令 (Slash Commands)
+## 💬 支援之 Slash 指令彙整 (Slash Commands)
 
 | 指令 | 說明 |
 | :--- | :--- |
@@ -67,13 +79,12 @@ python antigravity_discord_bridge.py
 
 ---
 
-## 🔒 隱私與安全性 (Privacy & Security)
+## 🔒 隱私與安全規範 (Privacy & Security)
 
-- 所有的問答、日誌與上傳檔案均儲存於本機，不經過第三方伺服器中轉。
-- `.gitignore` 已排除敏感的設定檔與日誌，請安心維護與開源！
+- 所有的問答、日誌與上傳檔案均儲存於本機，不經過任何第三方不可信伺服器中轉。
+- `.gitignore` 已嚴密排除真實設定檔 (`discord_bridge_config.json`) 與本機敏感日誌，確保開源程式碼庫的安全無虞。
 
 ---
 
 ## 📄 License
 MIT License
-
